@@ -23,7 +23,6 @@ pub mod export;
 pub mod io;
 pub mod models;
 pub(crate) mod expr;
-pub(crate) mod polynomial;
 pub mod registry;
 pub mod rules;
 pub mod solvers;

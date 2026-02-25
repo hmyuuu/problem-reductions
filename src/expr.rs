@@ -166,40 +166,6 @@ impl std::ops::Add for Expr {
     }
 }
 
-impl From<crate::polynomial::Polynomial> for Expr {
-    fn from(poly: crate::polynomial::Polynomial) -> Self {
-        let terms: Vec<Expr> = poly
-            .terms
-            .iter()
-            .map(|mono| {
-                // Build monomial: coefficient * Π(var^exp)
-                let mut expr = Expr::Const(mono.coefficient);
-                for &(name, exp) in &mono.variables {
-                    let var_expr = if exp == 1 {
-                        Expr::Var(name)
-                    } else {
-                        Expr::pow(Expr::Var(name), Expr::Const(exp as f64))
-                    };
-                    expr = Expr::mul(expr, var_expr);
-                }
-                // Simplify `1.0 * x` to just `x` for single-variable monomials
-                if let Expr::Mul(ref a, ref b) = expr {
-                    if matches!(a.as_ref(), Expr::Const(c) if (*c - 1.0).abs() < 1e-15) {
-                        return b.as_ref().clone();
-                    }
-                }
-                expr
-            })
-            .collect();
-
-        if terms.is_empty() {
-            return Expr::Const(0.0);
-        }
-
-        terms.into_iter().reduce(Expr::add).unwrap()
-    }
-}
-
 #[cfg(test)]
 #[path = "unit_tests/expr.rs"]
 mod tests;

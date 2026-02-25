@@ -97,7 +97,7 @@ pub(crate) struct EdgeJson {
     pub(crate) source: usize,
     /// Index into the `nodes` array for the target problem variant.
     pub(crate) target: usize,
-    /// Reduction overhead: output size as polynomials of input size.
+    /// Reduction overhead: output size as expressions of input size.
     pub(crate) overhead: Vec<OverheadFieldJson>,
     /// Relative rustdoc path for the reduction module.
     pub(crate) doc_path: String,
@@ -538,7 +538,7 @@ impl ReductionGraph {
         self.nodes.len()
     }
 
-    /// Get the per-edge overhead polynomials along a reduction path.
+    /// Get the per-edge overhead expressions along a reduction path.
     ///
     /// Returns one `ReductionOverhead` per edge (i.e., `path.steps.len() - 1` items).
     ///
@@ -575,7 +575,7 @@ impl ReductionGraph {
 
     /// Compose overheads along a path symbolically.
     ///
-    /// Returns a single `ReductionOverhead` whose polynomials map from the
+    /// Returns a single `ReductionOverhead` whose expressions map from the
     /// source problem's size variables directly to the final target's size variables.
     pub fn compose_path_overhead(&self, path: &ReductionPath) -> ReductionOverhead {
         self.path_overheads(path)
@@ -984,7 +984,7 @@ impl ReductionGraph {
     /// falls back to a name-only match (returning the first entry whose source and
     /// target names match). This is intentional: specific variants (e.g., `K3`) may
     /// not have their own `#[reduction]` entry, but the general variant (`KN`) covers
-    /// them with the same overhead polynomial. The fallback is safe because cross-name
+    /// them with the same overhead expression. The fallback is safe because cross-name
     /// reductions share the same overhead regardless of source variant; it is only
     /// used by the JSON export pipeline (`export::lookup_overhead`).
     pub fn find_best_entry(

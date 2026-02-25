@@ -19,18 +19,6 @@ impl ReductionOverhead {
         Self { output_size }
     }
 
-    /// Construct from legacy Polynomial-based overhead.
-    pub fn from_polynomials(
-        output_size: Vec<(&'static str, crate::polynomial::Polynomial)>,
-    ) -> Self {
-        Self {
-            output_size: output_size
-                .into_iter()
-                .map(|(name, poly)| (name, Expr::from(poly)))
-                .collect(),
-        }
-    }
-
     /// Identity overhead: each output field equals the same-named input field.
     /// Used by variant cast reductions where problem size doesn't change.
     pub fn identity(fields: &[&'static str]) -> Self {
