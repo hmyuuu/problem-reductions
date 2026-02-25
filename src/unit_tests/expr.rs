@@ -1,5 +1,6 @@
 use super::*;
 use crate::types::ProblemSize;
+use std::collections::{HashMap, HashSet};
 
 #[test]
 fn test_expr_const_eval() {
@@ -69,4 +70,75 @@ fn test_expr_complex() {
     );
     let size = ProblemSize::new(vec![("n", 4), ("m", 2)]);
     assert_eq!(e.eval(&size), 22.0); // 16 + 6
+}
+
+#[test]
+fn test_expr_variables() {
+    let e = Expr::add(
+        Expr::pow(Expr::Var("n"), Expr::Const(2.0)),
+        Expr::mul(Expr::Const(3.0), Expr::Var("m")),
+    );
+    let vars = e.variables();
+    assert_eq!(vars, HashSet::from(["n", "m"]));
+}
+
+#[test]
+fn test_expr_substitute() {
+    // n^2, substitute n → (a + b)
+    let e = Expr::pow(Expr::Var("n"), Expr::Const(2.0));
+    let replacement = Expr::add(Expr::Var("a"), Expr::Var("b"));
+    let mut mapping = HashMap::new();
+    mapping.insert("n", &replacement);
+    let result = e.substitute(&mapping);
+    // Should be (a + b)^2
+    let size = ProblemSize::new(vec![("a", 3), ("b", 2)]);
+    assert_eq!(result.eval(&size), 25.0); // (3+2)^2
+}
+
+#[test]
+fn test_expr_display_simple() {
+    assert_eq!(format!("{}", Expr::Const(5.0)), "5");
+    assert_eq!(format!("{}", Expr::Var("n")), "n");
+}
+
+#[test]
+fn test_expr_display_add() {
+    let e = Expr::add(Expr::Var("n"), Expr::Const(3.0));
+    assert_eq!(format!("{e}"), "n + 3");
+}
+
+#[test]
+fn test_expr_display_mul() {
+    let e = Expr::mul(Expr::Const(3.0), Expr::Var("n"));
+    assert_eq!(format!("{e}"), "3 * n");
+}
+
+#[test]
+fn test_expr_display_pow() {
+    let e = Expr::pow(Expr::Var("n"), Expr::Const(2.0));
+    assert_eq!(format!("{e}"), "n^2");
+}
+
+#[test]
+fn test_expr_display_exp() {
+    let e = Expr::Exp(Box::new(Expr::Var("n")));
+    assert_eq!(format!("{e}"), "exp(n)");
+}
+
+#[test]
+fn test_expr_display_nested() {
+    // n^2 + 3 * m
+    let e = Expr::add(
+        Expr::pow(Expr::Var("n"), Expr::Const(2.0)),
+        Expr::mul(Expr::Const(3.0), Expr::Var("m")),
+    );
+    assert_eq!(format!("{e}"), "n^2 + 3 * m");
+}
+
+#[test]
+fn test_expr_is_polynomial() {
+    assert!(Expr::Var("n").is_polynomial());
+    assert!(Expr::pow(Expr::Var("n"), Expr::Const(2.0)).is_polynomial());
+    assert!(!Expr::Exp(Box::new(Expr::Var("n"))).is_polynomial());
+    assert!(!Expr::Log(Box::new(Expr::Var("n"))).is_polynomial());
 }
