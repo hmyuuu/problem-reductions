@@ -143,7 +143,7 @@ pub fn show(problem: &str, out: &OutputConfig) -> Result<()> {
             "\n{}\n",
             crate::output::fmt_section(&format!("Size fields ({}):", size_fields.len()))
         ));
-        for f in size_fields {
+        for f in &size_fields {
             text.push_str(&format!("  {f}\n"));
         }
     }

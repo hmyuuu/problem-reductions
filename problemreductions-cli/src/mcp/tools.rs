@@ -177,7 +177,7 @@ impl McpServer {
         let mut json = serde_json::json!({
             "name": spec.name,
             "variants": variants,
-            "size_fields": size_fields,
+            "size_fields": &size_fields,
             "reduces_to": outgoing.iter().map(|e| {
                 serde_json::json!({
                     "source": {"name": e.source_name, "variant": e.source_variant},
