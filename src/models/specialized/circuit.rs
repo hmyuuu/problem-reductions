@@ -295,7 +295,6 @@ impl Problem for CircuitSAT {
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![]
     }
-
 }
 
 impl SatisfactionProblem for CircuitSAT {}

@@ -152,7 +152,6 @@ where
     fn evaluate(&self, config: &[usize]) -> bool {
         self.is_valid_coloring(config)
     }
-
 }
 
 impl<K: KValue, G: Graph + VariantParam> SatisfactionProblem for KColoring<K, G> {}

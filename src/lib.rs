@@ -20,9 +20,9 @@
 pub mod config;
 pub mod error;
 pub mod export;
+pub(crate) mod expr;
 pub mod io;
 pub mod models;
-pub(crate) mod expr;
 pub mod registry;
 pub mod rules;
 pub mod solvers;

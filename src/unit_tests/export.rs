@@ -34,7 +34,10 @@ fn test_overhead_to_json_constant() {
 fn test_overhead_to_json_scaled_power() {
     let overhead = ReductionOverhead::new(vec![(
         "num_edges",
-        Expr::mul(Expr::Const(3.0), Expr::pow(Expr::Var("n"), Expr::Const(2.0))),
+        Expr::mul(
+            Expr::Const(3.0),
+            Expr::pow(Expr::Var("n"), Expr::Const(2.0)),
+        ),
     )]);
     let entries = overhead_to_json(&overhead);
     assert_eq!(entries.len(), 1);

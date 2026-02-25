@@ -180,7 +180,6 @@ where
         let partition: Vec<bool> = config.iter().map(|&c| c != 0).collect();
         SolutionSize::Valid(cut_size(&self.graph, &self.edge_weights, &partition))
     }
-
 }
 
 impl<G, W> OptimizationProblem for MaxCut<G, W>

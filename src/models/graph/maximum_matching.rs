@@ -205,7 +205,6 @@ where
         }
         SolutionSize::Valid(total)
     }
-
 }
 
 impl<G, W> OptimizationProblem for MaximumMatching<G, W>

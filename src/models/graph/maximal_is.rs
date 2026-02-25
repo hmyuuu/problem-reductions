@@ -169,7 +169,6 @@ where
         }
         SolutionSize::Valid(total)
     }
-
 }
 
 impl<G, W> OptimizationProblem for MaximalIS<G, W>

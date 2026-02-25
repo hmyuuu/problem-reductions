@@ -363,7 +363,6 @@ impl Problem for ILP {
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![]
     }
-
 }
 
 impl OptimizationProblem for ILP {

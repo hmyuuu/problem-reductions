@@ -228,7 +228,6 @@ where
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![G, W]
     }
-
 }
 
 impl<G, W> OptimizationProblem for SpinGlass<G, W>

@@ -67,9 +67,7 @@ Problem (core trait — all problems must implement)
 ├── fn dims(&self) -> Vec<usize>       // config space: [2, 2, 2] for 3 binary variables
 ├── fn evaluate(&self, config) -> Metric
 ├── fn variant() -> Vec<(&str, &str)>  // e.g., [("graph","SimpleGraph"), ("weight","i32")]
-├── fn num_variables(&self) -> usize   // default: dims().len()
-├── fn problem_size_names() -> &[&str] // static field names for size metrics
-└── fn problem_size_values(&self) -> Vec<usize>  // instance-level size values
+└── fn num_variables(&self) -> usize   // default: dims().len()
 
 OptimizationProblem : Problem<Metric = SolutionSize<Self::Value>> (extension for optimization)
 │
@@ -97,6 +95,20 @@ enum Direction { Maximize, Minimize }
 - `WeightElement` trait: `type Sum: NumericSize` + `fn to_sum(&self)` — converts weight to a summable numeric type
 - Weight management via inherent methods (`weights()`, `set_weights()`, `is_weighted()`), not traits
 - `NumericSize` supertrait bundles common numeric bounds (`Clone + Default + PartialOrd + Num + Zero + Bounded + AddAssign + 'static`)
+
+### Overhead System
+Reduction overhead is expressed using `Expr` AST (in `src/expr.rs`) with the `#[reduction]` macro:
+```rust
+#[reduction(overhead = {
+    num_vertices = "num_vertices + num_clauses",
+    num_edges = "3 * num_clauses",
+})]
+impl ReduceTo<Target> for Source { ... }
+```
+- Expression strings are parsed at compile time by a Pratt parser in the proc macro crate
+- Each problem type provides inherent getter methods (e.g., `num_vertices()`, `num_edges()`) that the overhead expressions reference
+- `ReductionOverhead` stores `Vec<(&'static str, Expr)>` — field name to symbolic expression mappings
+- Expressions support: constants, variables, `+`, `*`, `^`, `exp()`, `log()`, `sqrt()`
 
 ### Problem Names
 Problem types use explicit optimization prefixes:

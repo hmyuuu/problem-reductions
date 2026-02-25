@@ -236,6 +236,7 @@ pub fn parse_expr(input: &str) -> Result<ParsedExpr, String> {
     Ok(expr)
 }
 
+#[allow(dead_code)]
 impl ParsedExpr {
     /// Generate TokenStream that constructs an `Expr` value.
     pub fn to_expr_tokens(&self) -> TokenStream {
@@ -360,8 +361,7 @@ impl ParsedExpr {
                 a.collect_vars(vars);
                 b.collect_vars(vars);
             }
-            ParsedExpr::Neg(a) | ParsedExpr::Exp(a) | ParsedExpr::Log(a)
-            | ParsedExpr::Sqrt(a) => {
+            ParsedExpr::Neg(a) | ParsedExpr::Exp(a) | ParsedExpr::Log(a) | ParsedExpr::Sqrt(a) => {
                 a.collect_vars(vars);
             }
         }
@@ -447,10 +447,7 @@ mod tests {
     #[test]
     fn test_parse_neg() {
         let e = parse_expr("-n").unwrap();
-        assert_eq!(
-            e,
-            ParsedExpr::Neg(Box::new(ParsedExpr::Var("n".into())))
-        );
+        assert_eq!(e, ParsedExpr::Neg(Box::new(ParsedExpr::Var("n".into()))));
     }
 
     #[test]

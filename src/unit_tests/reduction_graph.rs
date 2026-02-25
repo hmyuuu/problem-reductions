@@ -296,7 +296,11 @@ fn test_3sat_to_mis_triangular_overhead() {
             CNFClause::new(vec![-1, -2, -3]),
         ],
     );
-    let input_size = ProblemSize::new(vec![("num_vars", 3), ("num_clauses", 2), ("num_literals", 6)]);
+    let input_size = ProblemSize::new(vec![
+        ("num_vars", 3),
+        ("num_clauses", 2),
+        ("num_literals", 6),
+    ]);
 
     // Find the shortest path
     let path = graph
@@ -358,10 +362,7 @@ fn test_3sat_to_mis_triangular_overhead() {
     // Composed: num_vertices = L², num_edges = L²
     let composed = graph.compose_path_overhead(&path);
     // Evaluate composed at input: L=6, so L^2=36
-    assert_eq!(
-        composed.get("num_vertices").unwrap().eval(&test_size),
-        36.0
-    );
+    assert_eq!(composed.get("num_vertices").unwrap().eval(&test_size), 36.0);
     assert_eq!(composed.get("num_edges").unwrap().eval(&test_size), 36.0);
 }
 

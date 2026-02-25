@@ -37,8 +37,6 @@ trait Problem: Clone {
     fn evaluate(&self, config: &[usize]) -> Self::Metric;
     fn variant() -> Vec<(&'static str, &'static str)>; // e.g., [("graph", "SimpleGraph"), ("weight", "i32")]
     fn num_variables(&self) -> usize;      // default: dims().len()
-    fn problem_size_names() -> &'static [&'static str]; // e.g., ["num_vertices", "num_edges"]
-    fn problem_size_values(&self) -> Vec<usize>;       // e.g., [10, 15] for a specific instance
 }
 
 trait OptimizationProblem: Problem<Metric = SolutionSize<Self::Value>> {
@@ -49,7 +47,7 @@ trait OptimizationProblem: Problem<Metric = SolutionSize<Self::Value>> {
 trait SatisfactionProblem: Problem<Metric = bool> {}  // marker trait
 ```
 
-- **`Problem`** — the base trait. Every problem declares a `NAME` (e.g., `"MaximumIndependentSet"`). The solver explores the configuration space defined by `dims()` and scores each configuration with `evaluate()`. For example, a 4-vertex MIS has `dims() = [2, 2, 2, 2]` (each vertex is selected or not); `evaluate(&[1, 0, 1, 0])` returns `Valid(2)` if vertices 0 and 2 form an independent set, or `Invalid` if they share an edge. `problem_size_names()` and `problem_size_values()` expose the instance's structural dimensions (e.g., `num_vertices`, `num_edges`) as a `ProblemSize` — used by the reduction graph to evaluate overhead polynomials along a path.
+- **`Problem`** — the base trait. Every problem declares a `NAME` (e.g., `"MaximumIndependentSet"`). The solver explores the configuration space defined by `dims()` and scores each configuration with `evaluate()`. For example, a 4-vertex MIS has `dims() = [2, 2, 2, 2]` (each vertex is selected or not); `evaluate(&[1, 0, 1, 0])` returns `Valid(2)` if vertices 0 and 2 form an independent set, or `Invalid` if they share an edge. Each problem also provides inherent getter methods (e.g., `num_vertices()`, `num_edges()`) used by reduction overhead expressions.
 - **`OptimizationProblem`** — extends `Problem` with a comparable `Value` type and a `direction()` (`Maximize` or `Minimize`).
 - **`SatisfactionProblem`** — constrains `Metric = bool`: `true` if all constraints are satisfied, `false` otherwise.
 

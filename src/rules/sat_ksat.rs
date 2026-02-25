@@ -110,6 +110,7 @@ fn add_clause_to_ksat(
 /// because the `#[reduction]` proc macro requires concrete types.
 macro_rules! impl_sat_to_ksat {
     ($ktype:ty, $k:expr) => {
+        #[rustfmt::skip]
         #[reduction(overhead = {
             num_clauses = "num_clauses + num_literals",
             num_vars = "num_vars + num_literals",
@@ -182,6 +183,7 @@ fn reduce_ksat_to_sat<K: KValue>(ksat: &KSatisfiability<K>) -> ReductionKSATToSA
 /// The `#[reduction]` macro requires concrete types.
 macro_rules! impl_ksat_to_sat {
     ($ktype:ty) => {
+#[rustfmt::skip]
         #[reduction(overhead = {
             num_clauses = "num_clauses",
             num_vars = "num_vars",

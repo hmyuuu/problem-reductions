@@ -160,7 +160,6 @@ where
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![W]
     }
-
 }
 
 impl<W> OptimizationProblem for MaximumSetPacking<W>
