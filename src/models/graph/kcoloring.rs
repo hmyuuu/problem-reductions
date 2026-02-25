@@ -122,6 +122,18 @@ impl<G: Graph> KColoring<KN, G> {
     }
 }
 
+impl<K: KValue, G: Graph> KColoring<K, G> {
+    /// Get the number of vertices in the underlying graph.
+    pub fn num_vertices(&self) -> usize {
+        self.graph().num_vertices()
+    }
+
+    /// Get the number of edges in the underlying graph.
+    pub fn num_edges(&self) -> usize {
+        self.graph().num_edges()
+    }
+}
+
 impl<K: KValue, G> Problem for KColoring<K, G>
 where
     G: Graph + VariantParam,

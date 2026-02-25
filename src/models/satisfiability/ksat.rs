@@ -139,6 +139,11 @@ impl<K: KValue> KSatisfiability<K> {
         self.clauses.get(index)
     }
 
+    /// Get the total number of literals across all clauses.
+    pub fn num_literals(&self) -> usize {
+        self.clauses().iter().map(|c| c.len()).sum()
+    }
+
     /// Count satisfied clauses for an assignment.
     pub fn count_satisfied(&self, assignment: &[bool]) -> usize {
         self.clauses

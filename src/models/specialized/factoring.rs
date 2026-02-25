@@ -75,6 +75,16 @@ impl Factoring {
         self.n
     }
 
+    /// Get the number of bits for the first factor (alias for `m()`).
+    pub fn num_bits_first(&self) -> usize {
+        self.m()
+    }
+
+    /// Get the number of bits for the second factor (alias for `n()`).
+    pub fn num_bits_second(&self) -> usize {
+        self.n()
+    }
+
     /// Get the target number to factor.
     pub fn target(&self) -> u64 {
         self.target

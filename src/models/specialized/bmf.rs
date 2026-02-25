@@ -98,6 +98,16 @@ impl BMF {
         self.k
     }
 
+    /// Get the number of rows (alias for `rows()`).
+    pub fn m(&self) -> usize {
+        self.rows()
+    }
+
+    /// Get the number of columns (alias for `cols()`).
+    pub fn n(&self) -> usize {
+        self.cols()
+    }
+
     /// Get the target matrix.
     pub fn matrix(&self) -> &[Vec<bool>] {
         &self.matrix

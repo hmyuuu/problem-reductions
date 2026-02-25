@@ -129,6 +129,18 @@ impl<G: Graph, W: Clone + Default> MaximalIS<G, W> {
     }
 }
 
+impl<G: Graph, W: WeightElement> MaximalIS<G, W> {
+    /// Get the number of vertices in the underlying graph.
+    pub fn num_vertices(&self) -> usize {
+        self.graph().num_vertices()
+    }
+
+    /// Get the number of edges in the underlying graph.
+    pub fn num_edges(&self) -> usize {
+        self.graph().num_edges()
+    }
+}
+
 impl<G, W> Problem for MaximalIS<G, W>
 where
     G: Graph + crate::variant::VariantParam,

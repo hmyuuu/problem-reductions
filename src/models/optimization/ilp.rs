@@ -325,6 +325,16 @@ impl ILP {
     pub fn num_variables(&self) -> usize {
         self.num_vars
     }
+
+    /// Get the number of variables (alias matching `problem_size_names`).
+    pub fn num_vars(&self) -> usize {
+        self.num_variables()
+    }
+
+    /// Get the number of constraints.
+    pub fn num_constraints(&self) -> usize {
+        self.constraints.len()
+    }
 }
 
 impl Problem for ILP {

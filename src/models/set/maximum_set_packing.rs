@@ -113,6 +113,15 @@ impl<W: Clone + Default> MaximumSetPacking<W> {
         pairs
     }
 
+    /// Get the universe size (one more than the maximum element across all sets).
+    pub fn universe_size(&self) -> usize {
+        self.sets()
+            .iter()
+            .flat_map(|s| s.iter())
+            .max()
+            .map_or(0, |&m| m + 1)
+    }
+
     /// Get a reference to the weights vector.
     pub fn weights_ref(&self) -> &Vec<W> {
         &self.weights

@@ -119,6 +119,11 @@ impl BicliqueCover {
         self.k
     }
 
+    /// Get the rank (alias for `k()`).
+    pub fn rank(&self) -> usize {
+        self.k()
+    }
+
     /// Convert a configuration to biclique memberships.
     ///
     /// Config is a flat array where each vertex has k binary variables

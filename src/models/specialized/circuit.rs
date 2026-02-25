@@ -238,6 +238,11 @@ impl CircuitSAT {
         &self.variables
     }
 
+    /// Get the number of variables in the circuit.
+    pub fn num_variables(&self) -> usize {
+        self.variables.len()
+    }
+
     /// Check if a configuration is a valid satisfying assignment.
     pub fn is_valid_solution(&self, config: &[usize]) -> bool {
         self.count_satisfied(config) == self.circuit.num_assignments()
