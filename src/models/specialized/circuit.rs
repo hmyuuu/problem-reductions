@@ -238,6 +238,11 @@ impl CircuitSAT {
         &self.variables
     }
 
+    /// Get the number of variables in the circuit.
+    pub fn num_variables(&self) -> usize {
+        self.variables.len()
+    }
+
     /// Check if a configuration is a valid satisfying assignment.
     pub fn is_valid_solution(&self, config: &[usize]) -> bool {
         self.count_satisfied(config) == self.circuit.num_assignments()
@@ -289,13 +294,6 @@ impl Problem for CircuitSAT {
 
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![]
-    }
-
-    fn problem_size_names() -> &'static [&'static str] {
-        &["num_variables", "num_assignments"]
-    }
-    fn problem_size_values(&self) -> Vec<usize> {
-        vec![self.num_variables(), self.circuit().num_assignments()]
     }
 }
 

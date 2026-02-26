@@ -140,6 +140,11 @@ impl<G: Graph, W: Clone + Default> SpinGlass<G, W> {
         self.graph.num_vertices()
     }
 
+    /// Get the number of interactions (edges in the interaction graph).
+    pub fn num_interactions(&self) -> usize {
+        self.graph.num_edges()
+    }
+
     /// Get the interactions as ((i, j), weight) pairs.
     ///
     /// Reconstructs from graph.edges() and couplings.
@@ -222,13 +227,6 @@ where
 
     fn variant() -> Vec<(&'static str, &'static str)> {
         crate::variant_params![G, W]
-    }
-
-    fn problem_size_names() -> &'static [&'static str] {
-        &["num_spins", "num_interactions"]
-    }
-    fn problem_size_values(&self) -> Vec<usize> {
-        vec![self.num_spins(), self.graph().num_edges()]
     }
 }
 

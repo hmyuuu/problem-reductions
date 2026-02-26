@@ -95,6 +95,18 @@ impl<G: Graph, W: Clone + Default> MaximumClique<G, W> {
     }
 }
 
+impl<G: Graph, W: WeightElement> MaximumClique<G, W> {
+    /// Get the number of vertices in the underlying graph.
+    pub fn num_vertices(&self) -> usize {
+        self.graph().num_vertices()
+    }
+
+    /// Get the number of edges in the underlying graph.
+    pub fn num_edges(&self) -> usize {
+        self.graph().num_edges()
+    }
+}
+
 impl<G, W> Problem for MaximumClique<G, W>
 where
     G: Graph + crate::variant::VariantParam,
@@ -122,13 +134,6 @@ where
             }
         }
         SolutionSize::Valid(total)
-    }
-
-    fn problem_size_names() -> &'static [&'static str] {
-        &["num_vertices", "num_edges"]
-    }
-    fn problem_size_values(&self) -> Vec<usize> {
-        vec![self.graph().num_vertices(), self.graph().num_edges()]
     }
 }
 

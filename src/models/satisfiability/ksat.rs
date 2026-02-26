@@ -139,6 +139,11 @@ impl<K: KValue> KSatisfiability<K> {
         self.clauses.get(index)
     }
 
+    /// Get the total number of literals across all clauses.
+    pub fn num_literals(&self) -> usize {
+        self.clauses().iter().map(|c| c.len()).sum()
+    }
+
     /// Count satisfied clauses for an assignment.
     pub fn count_satisfied(&self, assignment: &[bool]) -> usize {
         self.clauses
@@ -169,14 +174,6 @@ impl<K: KValue> Problem for KSatisfiability<K> {
     fn evaluate(&self, config: &[usize]) -> bool {
         let assignment = Self::config_to_assignment(config);
         self.is_satisfying(&assignment)
-    }
-
-    fn problem_size_names() -> &'static [&'static str] {
-        &["num_vars", "num_clauses", "num_literals"]
-    }
-    fn problem_size_values(&self) -> Vec<usize> {
-        let num_literals: usize = self.clauses().iter().map(|c| c.len()).sum();
-        vec![self.num_vars(), self.num_clauses(), num_literals]
     }
 
     fn variant() -> Vec<(&'static str, &'static str)> {

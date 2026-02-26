@@ -20,9 +20,9 @@
 pub mod config;
 pub mod error;
 pub mod export;
+pub(crate) mod expr;
 pub mod io;
 pub mod models;
-pub(crate) mod polynomial;
 pub mod registry;
 pub mod rules;
 pub mod solvers;
@@ -49,7 +49,7 @@ pub mod prelude {
     // Core traits
     pub use crate::rules::{ReduceTo, ReductionResult};
     pub use crate::solvers::{BruteForce, Solver};
-    pub use crate::traits::{problem_size, OptimizationProblem, Problem, SatisfactionProblem};
+    pub use crate::traits::{OptimizationProblem, Problem, SatisfactionProblem};
 
     // Types
     pub use crate::error::{ProblemError, Result};
@@ -60,7 +60,7 @@ pub mod prelude {
 pub use error::{ProblemError, Result};
 pub use registry::{ComplexityClass, ProblemInfo};
 pub use solvers::{BruteForce, Solver};
-pub use traits::{problem_size, OptimizationProblem, Problem, SatisfactionProblem};
+pub use traits::{OptimizationProblem, Problem, SatisfactionProblem};
 pub use types::{
     Direction, NumericSize, One, ProblemSize, SolutionSize, Unweighted, WeightElement,
 };
@@ -71,9 +71,6 @@ pub use problemreductions_macros::reduction;
 #[cfg(test)]
 #[path = "unit_tests/graph_models.rs"]
 mod test_graph_models;
-#[cfg(test)]
-#[path = "unit_tests/problem_size.rs"]
-mod test_problem_size;
 #[cfg(test)]
 #[path = "unit_tests/property.rs"]
 mod test_property;
