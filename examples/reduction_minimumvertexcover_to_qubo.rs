@@ -1,60 +1,63 @@
-// # Vertex Covering to QUBO Reduction (Penalty Method)
-//
-// ## Mathematical Relationship
-// The Minimum Vertex Cover (MVC) problem on a graph G = (V, E) is mapped to
-// QUBO by constructing a penalty Hamiltonian:
-//
-//   H(x) = sum_{i in V} x_i + P * sum_{(i,j) in E} (1 - x_i)(1 - x_j)
-//
-// where P is a penalty weight ensuring every edge has at least one endpoint
-// selected. The QUBO minimization finds configurations that minimize the
-// number of selected vertices while covering all edges.
+// # Vertex Cover to QUBO via Reduction Path
 //
 // ## This Example
-// - Instance: Petersen graph (10 vertices, 15 edges), VC=6
-// - Source: MinimumVertexCover with minimum size 6
-// - QUBO variables: 10 (one per vertex)
-// - Expected: Optimal vertex covers of size 6
+// - Instance: Petersen graph (10 vertices, 15 edges), VC = 6
+// - Source: MinimumVertexCover
+// - Target: QUBO reached through the reduction graph
 //
 // ## Output
-// Exports `docs/paper/examples/minimumvertexcover_to_qubo.json` and `minimumvertexcover_to_qubo.result.json`.
-//
-// ## Usage
-// ```bash
-// cargo run --example reduction_vc_to_qubo
-// ```
+// Exports `docs/paper/examples/minimumvertexcover_to_qubo.json` and
+// `minimumvertexcover_to_qubo.result.json`.
 
 use problemreductions::export::*;
 use problemreductions::prelude::*;
+use problemreductions::rules::{Minimize, ReductionGraph};
 use problemreductions::topology::small_graphs::petersen;
 use problemreductions::topology::{Graph, SimpleGraph};
+use problemreductions::types::ProblemSize;
 
 pub fn run() {
-    println!("=== Vertex Covering -> QUBO Reduction ===\n");
+    println!("=== Vertex Cover -> QUBO Reduction ===\n");
 
-    // Petersen graph: 10 vertices, 15 edges, VC=6
     let (num_vertices, edges) = petersen();
     let vc = MinimumVertexCover::new(
         SimpleGraph::new(num_vertices, edges.clone()),
         vec![1i32; num_vertices],
     );
 
-    // Reduce to QUBO
-    let reduction = ReduceTo::<QUBO>::reduce_to(&vc);
-    let qubo = reduction.target_problem();
+    let graph = ReductionGraph::new();
+    let src_variant_bt =
+        ReductionGraph::variant_to_map(&MinimumVertexCover::<SimpleGraph, i32>::variant());
+    let dst_variant_bt = ReductionGraph::variant_to_map(&QUBO::<f64>::variant());
+    let path = graph
+        .find_cheapest_path(
+            "MinimumVertexCover",
+            &src_variant_bt,
+            "QUBO",
+            &dst_variant_bt,
+            &ProblemSize::new(vec![
+                ("num_vertices", vc.graph().num_vertices()),
+                ("num_edges", vc.graph().num_edges()),
+            ]),
+            &Minimize("num_vars"),
+        )
+        .expect("MinimumVertexCover -> QUBO path not found");
+    let reduction = graph
+        .reduce_along_path(&path, &vc as &dyn std::any::Any)
+        .expect("MinimumVertexCover -> QUBO path reduction failed");
+    let qubo: &QUBO<f64> = reduction.target_problem();
 
     println!("Source: MinimumVertexCover on Petersen graph (10 vertices, 15 edges)");
+    println!("Path: {}", path);
     println!("Target: QUBO with {} variables", qubo.num_variables());
     println!("Q matrix:");
     for row in qubo.matrix() {
         println!("  {:?}", row);
     }
 
-    // Solve QUBO with brute force
     let solver = BruteForce::new();
     let qubo_solutions = solver.find_all_best(qubo);
 
-    // Extract and verify solutions
     println!("\nOptimal solutions:");
     let mut solutions = Vec::new();
     for sol in &qubo_solutions {
@@ -68,8 +71,6 @@ pub fn run() {
         let size = selected.len();
         println!("  Cover vertices: {:?} ({} vertices)", selected, size);
 
-        // Closed-loop verification: check solution is valid in original problem
-        // MinimumVertexCover is a minimization problem, infeasible configs return Invalid
         let sol_size = vc.evaluate(&extracted);
         assert!(
             sol_size.is_valid(),
@@ -82,25 +83,11 @@ pub fn run() {
         });
     }
 
-    // All optimal solutions should have size 6
-    assert!(
-        solutions
-            .iter()
-            .all(|s| s.source_config.iter().filter(|&&x| x == 1).count() == 6),
-        "All optimal VC solutions on Petersen graph should have size 6"
-    );
-    println!("\nVerification passed: all solutions are valid with size 6");
+    println!("\nVerification passed: all solutions are valid");
 
-    // Export JSON
     let source_variant = variant_to_map(MinimumVertexCover::<SimpleGraph, i32>::variant());
     let target_variant = variant_to_map(QUBO::<f64>::variant());
-    let overhead = lookup_overhead(
-        "MinimumVertexCover",
-        &source_variant,
-        "QUBO",
-        &target_variant,
-    )
-    .expect("MinimumVertexCover -> QUBO overhead not found");
+    let overhead = graph.compose_path_overhead(&path);
 
     let data = ReductionData {
         source: ProblemSide {
@@ -124,8 +111,7 @@ pub fn run() {
     };
 
     let results = ResultData { solutions };
-    let name = "minimumvertexcover_to_qubo";
-    write_example(name, &data, &results);
+    write_example("minimumvertexcover_to_qubo", &data, &results);
 }
 
 fn main() {

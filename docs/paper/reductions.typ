@@ -585,7 +585,7 @@ Equivalent to the Ising model via the linear substitution $s_i = 2x_i - 1$. The 
 ]
 
 #problem-def("ILP")[
-  Given $n$ integer variables $bold(x) in ZZ^n$, constraint matrix $A in RR^(m times n)$, bounds $bold(b) in RR^m$, and objective $bold(c) in RR^n$, find $bold(x)$ minimizing $bold(c)^top bold(x)$ subject to $A bold(x) <= bold(b)$ and variable bounds.
+  Given $n$ variables $bold(x)$ over a domain $cal(D)$ (binary $cal(D) = {0,1}$ or integer $cal(D) = ZZ_(>=0)$), constraint matrix $A in RR^(m times n)$, bounds $bold(b) in RR^m$, and objective $bold(c) in RR^n$, find $bold(x) in cal(D)^n$ minimizing $bold(c)^top bold(x)$ subject to $A bold(x) <= bold(b)$.
 ][
 Integer Linear Programming is a universal modeling framework: virtually every NP-hard combinatorial optimization problem admits an ILP formulation. Relaxing integrality to $bold(x) in RR^n$ yields a linear program solvable in polynomial time, forming the basis of branch-and-bound solvers. When the number of integer variables $n$ is fixed, ILP is solvable in polynomial time by Lenstra's algorithm @lenstra1983 using the geometry of numbers, making it fixed-parameter tractable in $n$. The best known general algorithm achieves $O^*(n^n)$ via an FPT algorithm based on lattice techniques @dadush2012.
 
@@ -1032,49 +1032,6 @@ The _penalty method_ @glover2019 @lucas2014 converts a constrained optimization 
 $ f(bold(x)) = "obj"(bold(x)) + P sum_k g_k (bold(x))^2 $
 where $P$ is a penalty weight large enough that any constraint violation costs more than the entire objective range. Since $g_k (bold(x))^2 >= 0$ with equality iff $g_k (bold(x)) = 0$, minimizers of $f$ are feasible and optimal for the original problem. Because binary variables satisfy $x_i^2 = x_i$, the resulting $f$ is a quadratic in $bold(x)$, i.e.\ a QUBO.
 
-#let mis_qubo = load-example("maximumindependentset_to_qubo")
-#let mis_qubo_r = load-results("maximumindependentset_to_qubo")
-#reduction-rule("MaximumIndependentSet", "QUBO",
-  example: true,
-  example-caption: [IS on the Petersen graph ($n = 10$) to QUBO],
-  extra: [
-    *Source edges:* $= {#mis_qubo.source.instance.edges.map(e => $(#e.at(0), #e.at(1))$).join(", ")}$ \
-    *QUBO matrix* ($Q in RR^(#mis_qubo.target.instance.num_vars times #mis_qubo.target.instance.num_vars)$):
-    $ Q = #math.mat(..mis_qubo.target.instance.matrix.map(row => row.map(v => {
-      let r = calc.round(v, digits: 0)
-      [#r]
-    }))) $
-    *Optimal IS* (size #mis_qubo_r.solutions.at(0).source_config.filter(x => x == 1).len()):
-    #mis_qubo_r.solutions.map(sol => {
-      let verts = sol.source_config.enumerate().filter(((i, x)) => x == 1).map(((i, x)) => str(i))
-      $\{#verts.join(", ")\}$
-    }).join(", ")
-  ],
-)[
-  An independent set selects vertices with no two adjacent. Each vertex $i$ gets a binary variable $x_i in {0,1}$ indicating selection, and the objective $sum_i w_i x_i$ rewards large sets. The adjacency constraint $x_i x_j = 0$ for each edge is naturally quadratic, so the penalty method directly yields a QUBO: diagonal entries reward vertex selection, while off-diagonal entries penalize adjacent pairs with a weight large enough to make any edge violation costlier than selecting all vertices.
-][
-  _Construction._ The IS objective is: maximize $sum_i w_i x_i$ subject to $x_i x_j = 0$ for $(i,j) in E$. Applying the penalty method (@sec:penalty-method):
-  $ f(bold(x)) = -sum_i w_i x_i + P sum_((i,j) in E) x_i x_j $
-  with $P = 1 + sum_i w_i$. Reading off the QUBO coefficients: diagonal $Q_(i i) = -w_i$ (linear reward for selection), off-diagonal $Q_(i j) = P$ for edges $i < j$ (quadratic penalty for adjacency).
-
-  _Correctness._ ($arrow.r.double$) If $bold(x)$ encodes a maximum-weight IS $S^*$, then all penalty terms vanish ($x_i x_j = 0$ for all edges), and $f(bold(x)) = -sum_(i in S^*) w_i$. Any non-IS assignment activates at least one penalty $P > sum_i w_i$, yielding $f > 0 >= f(bold(x))$. ($arrow.l.double$) Among feasible assignments (independent sets), the penalty terms vanish and $f(bold(x)) = -sum_(i in S) w_i$, minimized exactly when $S$ is a maximum-weight IS. Thus QUBO minimizers correspond to maximum-weight independent sets.
-
-  _Solution extraction._ Return $bold(x)$ directly — each $x_i = 1$ indicates vertex $i$ is in the IS.
-]
-
-#reduction-rule("MinimumVertexCover", "QUBO")[
-  A vertex cover must include at least one endpoint of every edge. The covering constraint for edge $(i,j)$ — that $x_i = x_j = 0$ is forbidden — translates to the quadratic penalty $(1-x_i)(1-x_j)$, which equals 1 exactly when neither endpoint is selected. The penalty method combines the weight-minimization objective with these coverage penalties into a single QUBO, where diagonal entries reflect the trade-off between vertex cost and coverage benefit, and off-diagonal entries penalize uncovered edges.
-][
-  _Construction._ The VC objective is: minimize $sum_i w_i x_i$ subject to $x_i + x_j >= 1$ for $(i,j) in E$. Applying the penalty method (@sec:penalty-method), the constraint $x_i + x_j >= 1$ is violated iff $x_i = x_j = 0$, with penalty $(1 - x_i)(1 - x_j)$:
-  $ f(bold(x)) = sum_i w_i x_i + P sum_((i,j) in E) (1 - x_i)(1 - x_j) $
-  with $P = 1 + sum_i w_i$. Expanding: $(1 - x_i)(1 - x_j) = 1 - x_i - x_j + x_i x_j$.
-  Summing over all edges, each vertex $i$ appears in $"deg"(i)$ penalty terms. The QUBO coefficients are: diagonal $Q_(i i) = w_i - P dot "deg"(i)$ (objective cost minus linear penalty for coverage), off-diagonal $Q_(i j) = P$ for edges (quadratic penalty). The constant $P |E|$ does not affect the minimizer.
-
-  _Correctness._ ($arrow.r.double$) If $bold(x)$ encodes a minimum vertex cover, every edge has at least one endpoint selected, so all penalty terms $(1-x_i)(1-x_j) = 0$ vanish and $f(bold(x)) = sum_(i in C) w_i$. ($arrow.l.double$) If some edge $(i,j)$ is uncovered ($x_i = x_j = 0$), the penalty $P > sum_i w_i$ exceeds the entire objective range, so $bold(x)$ cannot be a minimizer. Among valid covers (all penalties zero), $f(bold(x)) = sum_(i in C) w_i$ up to a constant, minimized exactly when $C$ is a minimum-weight vertex cover.
-
-  _Solution extraction._ Return $bold(x)$ directly — each $x_i = 1$ indicates vertex $i$ is in the cover.
-]
-
 #let kc_qubo = load-example("kcoloring_to_qubo")
 #let kc_qubo_r = load-results("kcoloring_to_qubo")
 #let kc_qubo_sol = kc_qubo_r.solutions.at(0)
@@ -1517,24 +1474,14 @@ where $P$ is a penalty weight large enough that any constraint violation costs m
 
 The following reductions to Integer Linear Programming are straightforward formulations where problem constraints map directly to linear inequalities.
 
-#reduction-rule("MaximumIndependentSet", "ILP")[
-  Each vertex is either selected or not, and each edge forbids selecting both endpoints -- a constraint that is directly linear in binary indicator variables.
+#reduction-rule("MaximumSetPacking", "ILP")[
+  Each set is either selected or not, and every universe element may belong to at most one selected set -- an element-based constraint that is directly linear in binary indicator variables.
 ][
-  _Construction._ Variables: $x_v in {0, 1}$ for each $v in V$. Constraints: $x_u + x_v <= 1$ for each $(u, v) in E$. Objective: maximize $sum_v w_v x_v$.
+  _Construction._ Variables: $x_i in {0, 1}$ for each set $S_i in cal(S)$. Constraints: $sum_(S_i in.rev e) x_i <= 1$ for each element $e in U$. Objective: maximize $sum_i w_i x_i$.
 
-  _Correctness._ ($arrow.r.double$) An independent set has no two adjacent vertices selected, so all edge constraints hold. ($arrow.l.double$) Any feasible binary solution selects no two adjacent vertices, forming an independent set; the objective maximizes total weight.
+  _Correctness._ ($arrow.r.double$) A valid packing chooses pairwise disjoint sets, so each element is covered at most once. ($arrow.l.double$) Any feasible binary solution covers each element at most once, hence the chosen sets are pairwise disjoint; the objective maximizes total weight.
 
-  _Solution extraction._ $S = {v : x_v = 1}$.
-]
-
-#reduction-rule("MinimumVertexCover", "ILP")[
-  Every edge must be covered by at least one endpoint -- a lower-bound constraint that is directly linear in binary vertex indicators.
-][
-  _Construction._ Variables: $x_v in {0, 1}$ for each $v in V$. Constraints: $x_u + x_v >= 1$ for each $(u, v) in E$. Objective: minimize $sum_v w_v x_v$.
-
-  _Correctness._ ($arrow.r.double$) A vertex cover includes at least one endpoint of every edge, satisfying all constraints. ($arrow.l.double$) Any feasible solution covers every edge; the objective minimizes total weight.
-
-  _Solution extraction._ $C = {v : x_v = 1}$.
+  _Solution extraction._ $cal(P) = {S_i : x_i = 1}$.
 ]
 
 #reduction-rule("MaximumMatching", "ILP")[
@@ -1545,16 +1492,6 @@ The following reductions to Integer Linear Programming are straightforward formu
   _Correctness._ ($arrow.r.double$) A matching has at most one edge per vertex, so all degree constraints hold. ($arrow.l.double$) Any feasible solution is a matching by construction; the objective maximizes total weight.
 
   _Solution extraction._ $M = {e : x_e = 1}$.
-]
-
-#reduction-rule("MaximumSetPacking", "ILP")[
-  Two sets conflict if they share a universe element, and at most one of each conflicting pair may be selected -- the same exclusion structure as independent set on the intersection graph, expressible as pairwise linear constraints.
-][
-  _Construction._ Variables: $x_i in {0, 1}$ for each $S_i in cal(S)$. Constraints: $x_i + x_j <= 1$ for each overlapping pair $S_i, S_j in cal(S)$ with $S_i inter S_j != emptyset$. Objective: maximize $sum_i w_i x_i$.
-
-  _Correctness._ ($arrow.r.double$) A packing has mutually disjoint sets, so no overlapping pair is co-selected. ($arrow.l.double$) Any feasible solution selects only mutually disjoint sets; the objective maximizes total weight.
-
-  _Solution extraction._ $cal(P) = {S_i : x_i = 1}$.
 ]
 
 #reduction-rule("MinimumSetCovering", "ILP")[
@@ -1724,13 +1661,13 @@ The following table shows concrete variable overhead for example instances, gene
   "minimumvertexcover_to_minimumsetcovering",
   "maxcut_to_spinglass", "spinglass_to_maxcut",
   "spinglass_to_qubo", "qubo_to_spinglass",
-  "maximumindependentset_to_qubo", "minimumvertexcover_to_qubo", "kcoloring_to_qubo",
+  "maximumindependentset_to_qubo", "kcoloring_to_qubo",
   "maximumsetpacking_to_qubo", "ksatisfiability_to_qubo", "ilp_to_qubo",
   "satisfiability_to_maximumindependentset", "satisfiability_to_kcoloring", "satisfiability_to_minimumdominatingset", "satisfiability_to_ksatisfiability",
   "circuitsat_to_spinglass", "factoring_to_circuitsat",
-  "maximumindependentset_to_ilp", "minimumvertexcover_to_ilp", "maximummatching_to_ilp",
+  "maximumsetpacking_to_ilp", "maximummatching_to_ilp",
   "kcoloring_to_ilp", "factoring_to_ilp",
-  "maximumsetpacking_to_ilp", "minimumsetcovering_to_ilp",
+  "minimumsetcovering_to_ilp",
   "minimumdominatingset_to_ilp", "maximumclique_to_ilp",
   "travelingsalesman_to_ilp",
 )

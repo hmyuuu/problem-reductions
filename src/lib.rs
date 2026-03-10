@@ -10,7 +10,7 @@
 //! | [`models`] | Problem types — [`graph`](models::graph), [`formula`](models::formula), [`set`](models::set), [`algebraic`](models::algebraic), [`misc`](models::misc) |
 //! | [`rules`] | Reduction rules, [`ReductionGraph`](rules::ReductionGraph) for path search |
 //! | [`solvers`] | [`BruteForce`] and [`ILPSolver`](solvers::ILPSolver) |
-//! | [`topology`] | Graph types — [`SimpleGraph`](topology::SimpleGraph), [`HyperGraph`](topology::HyperGraph), [`UnitDiskGraph`](topology::UnitDiskGraph), etc. |
+//! | [`topology`] | Graph types — [`SimpleGraph`](topology::SimpleGraph), [`UnitDiskGraph`](topology::UnitDiskGraph), etc. |
 //! | [`traits`] | Core traits — [`Problem`], [`OptimizationProblem`], [`SatisfactionProblem`] |
 //! | [`types`] | [`SolutionSize`], [`Direction`], [`ProblemSize`], [`WeightElement`] |
 //! | [`variant`] | Variant parameter system for problem type parameterization |
@@ -58,6 +58,7 @@ pub mod prelude {
 
 // Re-export commonly used items at crate root
 pub use error::{ProblemError, Result};
+pub use expr::{asymptotic_normal_form, AsymptoticAnalysisError};
 pub use registry::{ComplexityClass, ProblemInfo};
 pub use solvers::{BruteForce, Solver};
 pub use traits::{OptimizationProblem, Problem, SatisfactionProblem};

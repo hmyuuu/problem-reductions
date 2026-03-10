@@ -1,5 +1,6 @@
 //! Reduction rules between NP-hard problems.
 
+pub mod analysis;
 pub mod cost;
 pub mod registry;
 pub use cost::{CustomCost, Minimize, MinimizeSteps, PathCostFn};
@@ -15,14 +16,12 @@ mod ksatisfiability_qubo;
 mod maximumindependentset_casts;
 mod maximumindependentset_gridgraph;
 mod maximumindependentset_maximumsetpacking;
-mod maximumindependentset_qubo;
 mod maximumindependentset_triangular;
 mod maximummatching_maximumsetpacking;
 mod maximumsetpacking_casts;
 mod maximumsetpacking_qubo;
 mod minimumvertexcover_maximumindependentset;
 mod minimumvertexcover_minimumsetcovering;
-mod minimumvertexcover_qubo;
 mod sat_circuitsat;
 mod sat_coloring;
 mod sat_ksat;
@@ -42,11 +41,11 @@ mod coloring_ilp;
 #[cfg(feature = "ilp-solver")]
 mod factoring_ilp;
 #[cfg(feature = "ilp-solver")]
+mod ilp_bool_ilp_i32;
+#[cfg(feature = "ilp-solver")]
 mod ilp_qubo;
 #[cfg(feature = "ilp-solver")]
 mod maximumclique_ilp;
-#[cfg(feature = "ilp-solver")]
-mod maximumindependentset_ilp;
 #[cfg(feature = "ilp-solver")]
 mod maximummatching_ilp;
 #[cfg(feature = "ilp-solver")]
@@ -55,8 +54,6 @@ mod maximumsetpacking_ilp;
 mod minimumdominatingset_ilp;
 #[cfg(feature = "ilp-solver")]
 mod minimumsetcovering_ilp;
-#[cfg(feature = "ilp-solver")]
-mod minimumvertexcover_ilp;
 #[cfg(feature = "ilp-solver")]
 mod qubo_ilp;
 #[cfg(feature = "ilp-solver")]
