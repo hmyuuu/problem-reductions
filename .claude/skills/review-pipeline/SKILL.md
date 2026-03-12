@@ -71,6 +71,7 @@ review-agentic PRs:
 Create an isolated git worktree so the main working directory stays clean:
 
 ```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 BRANCH=$(gh pr view $PR --json headRefName --jq .headRefName)
 WORKTREE_DIR=".worktrees/review-$BRANCH"
@@ -238,7 +239,7 @@ For each retry:
 ### 5. Clean Up Worktree
 
 ```bash
-cd /Users/liujinguo/rcode/problemreductions
+cd "$REPO_ROOT"
 git worktree remove "$WORKTREE_DIR" --force
 ```
 

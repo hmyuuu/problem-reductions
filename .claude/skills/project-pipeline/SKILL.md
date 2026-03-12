@@ -105,6 +105,7 @@ Ready issues (ranked):
 Create an isolated git worktree for this issue so the main working directory stays clean:
 
 ```bash
+REPO_ROOT=$(git rev-parse --show-toplevel)
 git fetch origin main
 BRANCH="issue-<number>-<slug>"
 WORKTREE_DIR=".worktrees/$BRANCH"
@@ -166,7 +167,7 @@ gh project item-edit \
 After the issue is processed (success or failure), clean up the worktree:
 
 ```bash
-cd /Users/liujinguo/rcode/problemreductions
+cd "$REPO_ROOT"
 git worktree remove "$WORKTREE_DIR" --force
 ```
 
