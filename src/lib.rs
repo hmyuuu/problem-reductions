@@ -45,7 +45,8 @@ pub mod prelude {
     };
     pub use crate::models::graph::{
         KColoring, MaxCut, MaximalIS, MaximumClique, MaximumIndependentSet, MaximumMatching,
-        MinimumDominatingSet, MinimumFeedbackArcSet, MinimumFeedbackVertexSet, MinimumVertexCover,
+        MinimumDominatingSet, MinimumFeedbackArcSet, MinimumFeedbackVertexSet,
+        MinimumSumMulticenter, MinimumVertexCover,
         PartitionIntoTriangles, RuralPostman, TravelingSalesman,
     };
     pub use crate::models::misc::{

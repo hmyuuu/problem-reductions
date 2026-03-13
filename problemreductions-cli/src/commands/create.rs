@@ -93,6 +93,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         "QUBO" => "--matrix \"1,0.5;0.5,2\"",
         "SpinGlass" => "--graph 0-1,1-2 --couplings 1,1",
         "KColoring" => "--graph 0-1,1-2,2-0 --k 3",
+        "MinimumSumMulticenter" => "--graph 0-1,1-2,2-3 --weights 1,1,1,1 --edge-weights 1,1,1 --k 2",
         "PartitionIntoTriangles" => "--graph 0-1,1-2,0-2",
         "Factoring" => "--target 15 --m 4 --n 4",
         "MinimumFeedbackArcSet" => "--arcs \"0>1,1>2,2>0\"",
@@ -560,6 +561,32 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             let weights = parse_arc_weights(args, num_arcs)?;
             (
                 ser(MinimumFeedbackArcSet::new(graph, weights))?,
+                resolved_variant.clone(),
+            )
+        }
+
+        // MinimumSumMulticenter (p-median)
+        "MinimumSumMulticenter" => {
+            let (graph, n) = parse_graph(args).map_err(|e| {
+                anyhow::anyhow!(
+                    "{e}\n\nUsage: pred create MinimumSumMulticenter --graph 0-1,1-2,2-3 [--weights 1,1,1,1] [--edge-weights 1,1,1] --k 2"
+                )
+            })?;
+            let vertex_weights = parse_vertex_weights(args, n)?;
+            let edge_lengths = parse_edge_weights(args, graph.num_edges())?;
+            let k = args.k.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "MinimumSumMulticenter requires --k (number of centers)\n\n\
+                     Usage: pred create MinimumSumMulticenter --graph 0-1,1-2,2-3 --k 2"
+                )
+            })?;
+            (
+                ser(MinimumSumMulticenter::new(
+                    graph,
+                    vertex_weights,
+                    edge_lengths,
+                    k,
+                ))?,
                 resolved_variant.clone(),
             )
         }
