@@ -163,7 +163,43 @@ This is **required** for every new model — it ensures the Problem trait implem
 
 ## Step 6: Document in paper
 
-Invoke the `/write-model-in-paper` skill to write the problem-def entry in `docs/paper/reductions.typ`. That skill covers the full authoring process: formal definition, background, example with visualization, algorithm list, and verification checklist.
+Write a `problem-def` entry in `docs/paper/reductions.typ`. **Reference example:** search for `problem-def("MaximumIndependentSet")` to see the gold-standard entry — use it as a template.
+
+### 6a. Register display name
+
+Add to the `display-name` dictionary near the top of `reductions.typ`:
+```typst
+"ProblemName": [Display Name],
+```
+
+### 6b. Write formal definition (`def` parameter)
+
+```typst
+#problem-def("ProblemName")[
+  Given [inputs with domains], find [solution] [maximizing/minimizing] [objective] such that [constraints].
+][
+```
+Requirements: introduce all inputs first, state the objective, define all notation before use.
+
+### 6c. Write body (background + example)
+
+The body goes AFTER auto-generated sections (complexity table, reductions, schema). Four parts:
+
+**Background (1-3 sentences):** Historical context, applications, structural properties.
+
+**Best known algorithms:** Integrate naturally into prose with citations. Every complexity claim MUST have `@citation`. If best known is brute-force, add `#footnote[No algorithm improving on brute-force is known for ...]`.
+
+**Example with visualization:** A concrete small instance with a CeTZ diagram. For graph problems, use `g-node()` and `g-edge()` helpers — see the MaximumIndependentSet entry. Highlight solution with `graph-colors.at(0)`.
+
+**Evaluation:** Show the objective/verifier computed on the example solution (can be woven into example text).
+
+### 6d. Build and verify
+
+```bash
+make paper  # Must compile without errors
+```
+
+Checklist: display name registered, notation self-contained, background present, algorithms cited, example with diagram present, evaluation shown, paper compiles.
 
 ## Step 7: Verify
 
