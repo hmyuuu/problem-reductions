@@ -34,7 +34,7 @@ This skill runs **fully autonomously** -- no confirmation prompts, no user quest
 ### 0. Discover review-agentic Items
 
 ```bash
-gh project item-list 8 --owner CodingThrust --format json
+gh project item-list 8 --owner CodingThrust --format json --limit 500
 ```
 
 Filter items where `status == "review-agentic"`. Each item should have an associated PR. Extract the PR number from the item title or linked issue.

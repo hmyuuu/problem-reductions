@@ -38,7 +38,7 @@ This skill runs **fully autonomously** — no confirmation prompts, no user ques
 #### 0a. Fetch Ready Issues
 
 ```bash
-gh project item-list 8 --owner CodingThrust --format json
+gh project item-list 8 --owner CodingThrust --format json --limit 500
 ```
 
 Filter items where `status == "Ready"`. Partition into `[Model]` and `[Rule]` buckets.
@@ -215,3 +215,4 @@ Completed: 2/4 | In Review: 3 | Returned to Ready: 1
 | Not syncing main between batch issues | Each issue gets a fresh worktree from `origin/main` |
 | Worktree left behind on failure | Always clean up with `git worktree remove` in Step 5 |
 | Working in main checkout | All work happens in `.worktrees/` — never modify the main checkout |
+| Missing items from project board | `gh project item-list` defaults to 30 items — always use `--limit 500` |
