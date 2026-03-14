@@ -266,6 +266,64 @@ Work through these topics in order, using `AskUserQuestion` where multiple-choic
          description: "I'll describe the input structure"
    ```
 
+7. **Variants** — Based on the data representation answer, ask about applicable variants using `AskUserQuestion`. Only show options that are viable for the problem's input structure. Skip this question entirely if no variants apply (e.g., the problem has a fixed unique input structure like Knapsack, Factoring, SubsetSum).
+
+   **If the input is a graph** (from step 6), ask about graph topology:
+   ```
+   AskUserQuestion:
+     question: "Which graph topologies should this problem support?"
+     header: "Graph topology"
+     multiSelect: true
+     options:
+       - label: "General graphs"
+         description: "No structural restriction (SimpleGraph) — default, almost always needed"
+       - label: "Planar graphs"
+         description: "Graphs embeddable in the plane without edge crossings"
+       - label: "Bipartite graphs"
+         description: "Graphs whose vertices split into two groups with edges only between groups"
+       - label: "Unit disk graphs"
+         description: "Intersection graphs of unit disks in the plane"
+       - label: "Kings subgraph"
+         description: "Subgraphs of the king's graph on a grid"
+       - label: "Triangular subgraph"
+         description: "Subgraphs of the triangular lattice"
+   ```
+   Only include topology options that are meaningful for the problem (e.g., don't offer "Kings subgraph" for a problem that doesn't have special structure on grids).
+
+   **If the problem can be weighted or unweighted**, ask:
+   ```
+   AskUserQuestion:
+     question: "Should this problem support weighted instances?"
+     header: "Weights"
+     options:
+       - label: "Unweighted only"
+         description: "All elements have unit weight — simpler formulation"
+       - label: "Weighted (integers)"
+         description: "Elements have integer weights"
+       - label: "Weighted (real numbers)"
+         description: "Elements have real-valued weights"
+       - label: "Both weighted and unweighted"
+         description: "Support unit weight and integer weight variants"
+   ```
+   Skip this if the problem inherently requires specific numeric values (e.g., QUBO always has a weight matrix, Knapsack always has item values).
+
+   **If the problem has a parameter K** (e.g., K-coloring, K-satisfiability), ask:
+   ```
+   AskUserQuestion:
+     question: "Should K be a fixed constant or a general parameter?"
+     header: "K parameter"
+     options:
+       - label: "General K"
+         description: "K is part of the input — problem is NP-hard for general K"
+       - label: "Fixed small K values"
+         description: "Define variants for specific K (e.g., K=2, K=3) with different complexities"
+       - label: "Both"
+         description: "General K plus specific fixed-K variants with known better algorithms"
+   ```
+   Skip this if the problem has no natural K parameter.
+
+   Record the chosen variants — they will appear in the Schema section of the issue draft (the "Variants" field).
+
 After model brainstorming is complete, proceed to **Step 3b: Topology Analysis**.
 
 ### For Rules (standalone)
