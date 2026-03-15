@@ -83,6 +83,7 @@
   "SubgraphIsomorphism": [Subgraph Isomorphism],
   "PartitionIntoTriangles": [Partition Into Triangles],
   "FlowShopScheduling": [Flow Shop Scheduling],
+  "MinimumTardinessSequencing": [Minimum Tardiness Sequencing],
 )
 
 // Definition label: "def:<ProblemName>" — each definition block must have a matching label
@@ -1333,6 +1334,16 @@ Biclique Cover is equivalent to factoring the biadjacency matrix $M$ of the bipa
     }),
     caption: [Flow shop schedule for 5 jobs on 3 machines. Job order $(j_4, j_1, j_5, j_3, j_2)$ achieves makespan 23, within deadline $D = 25$ (dashed red line).],
   ) <fig:flowshop>
+]
+
+#problem-def("MinimumTardinessSequencing")[
+  Given a set $T$ of $n$ unit-length tasks, a deadline function $d: T -> ZZ^+$, and a partial order $prec.eq$ on $T$, find a one-machine schedule $sigma: T -> {1, 2, dots, n}$ that respects the precedence constraints (if $t_i prec.eq t_j$ then $sigma(t_i) < sigma(t_j)$) and minimizes the number of _tardy_ tasks, i.e., tasks $t$ with $sigma(t) > d(t)$.
+][
+  Minimum Tardiness Sequencing is a classical NP-complete scheduling problem catalogued as SS2 in Garey & Johnson @garey1979. In standard scheduling notation it is written $1 | "prec", p_j = 1 | sum U_j$, where $U_j = 1$ if job $j$ finishes after its deadline and $U_j = 0$ otherwise.
+
+  The problem is NP-complete by reduction from Clique (Theorem 3.10 in @garey1979). When the precedence constraints are empty, the problem becomes solvable in $O(n log n)$ time by Moore's algorithm @moore1968: sort tasks by deadline and greedily schedule each task on time, removing the task with the largest processing time whenever a deadline violation occurs. With arbitrary precedence constraints and unit processing times, the problem remains strongly NP-hard.
+
+  The search space consists of all topological orderings of the partial order, and the objective counts the number of late tasks. For $n$ tasks with no precedence constraints, the brute-force complexity is $O(n!)$.
 ]
 
 // Completeness check: warn about problem types in JSON but missing from paper

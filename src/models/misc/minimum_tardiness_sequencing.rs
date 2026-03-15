@@ -132,37 +132,43 @@ impl Problem for MinimumTardinessSequencing {
     }
 
     fn dims(&self) -> Vec<usize> {
-        vec![self.num_tasks; self.num_tasks]
+        let n = self.num_tasks;
+        (0..n).rev().map(|i| i + 1).collect()
     }
 
     fn evaluate(&self, config: &[usize]) -> SolutionSize<usize> {
-        if config.len() != self.num_tasks {
+        let n = self.num_tasks;
+        if config.len() != n {
             return SolutionSize::Invalid;
         }
 
-        // Check that all values are in range
-        if config.iter().any(|&v| v >= self.num_tasks) {
-            return SolutionSize::Invalid;
-        }
-
-        // Check bijection (valid permutation)
-        let mut seen = vec![false; self.num_tasks];
-        for &pos in config {
-            if seen[pos] {
+        // Decode Lehmer code into a permutation.
+        // config[i] must be < n - i (the domain size for position i).
+        let mut available: Vec<usize> = (0..n).collect();
+        let mut schedule = Vec::with_capacity(n);
+        for &c in config.iter() {
+            if c >= available.len() {
                 return SolutionSize::Invalid;
             }
-            seen[pos] = true;
+            schedule.push(available.remove(c));
+        }
+
+        // schedule[i] = the task scheduled at position i.
+        // We need sigma(task) = position, i.e., the inverse permutation.
+        let mut sigma = vec![0usize; n];
+        for (pos, &task) in schedule.iter().enumerate() {
+            sigma[task] = pos;
         }
 
         // Check precedence constraints: for each (pred, succ), sigma(pred) < sigma(succ)
         for &(pred, succ) in &self.precedences {
-            if config[pred] >= config[succ] {
+            if sigma[pred] >= sigma[succ] {
                 return SolutionSize::Invalid;
             }
         }
 
         // Count tardy tasks: task t is tardy if sigma(t) + 1 > d(t)
-        let tardy_count = config
+        let tardy_count = sigma
             .iter()
             .enumerate()
             .filter(|&(t, &pos)| pos + 1 > self.deadlines[t])
@@ -182,6 +188,24 @@ impl OptimizationProblem for MinimumTardinessSequencing {
 
 crate::declare_variants! {
     default opt MinimumTardinessSequencing => "2^num_tasks",
+}
+
+#[cfg(feature = "example-db")]
+pub(crate) fn canonical_model_example_specs() -> Vec<crate::example_db::specs::ModelExampleSpec> {
+    vec![crate::example_db::specs::ModelExampleSpec {
+        id: "minimum_tardiness_sequencing",
+        build: || {
+            // 4 tasks with precedence 0 -> 2 (task 0 before task 2).
+            // Deadlines: task 0 by time 2, task 1 by time 3, task 2 by time 1, task 3 by time 4.
+            let problem = MinimumTardinessSequencing::new(
+                4,
+                vec![2, 3, 1, 4],
+                vec![(0, 2)],
+            );
+            // Sample config: Lehmer code [0,0,0,0] = identity permutation (schedule order 0,1,2,3)
+            crate::example_db::specs::optimization_example(problem, vec![vec![0, 0, 0, 0]])
+        },
+    }]
 }
 
 #[cfg(test)]

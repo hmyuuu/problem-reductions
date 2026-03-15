@@ -14,7 +14,7 @@ fn test_minimum_tardiness_sequencing_basic() {
     assert_eq!(problem.deadlines(), &[5, 5, 5, 3, 3]);
     assert_eq!(problem.precedences(), &[(0, 3), (1, 3), (1, 4), (2, 4)]);
     assert_eq!(problem.num_precedences(), 4);
-    assert_eq!(problem.dims(), vec![5; 5]);
+    assert_eq!(problem.dims(), vec![5, 4, 3, 2, 1]);
     assert_eq!(problem.direction(), Direction::Minimize);
     assert_eq!(
         <MinimumTardinessSequencing as Problem>::NAME,
@@ -31,22 +31,26 @@ fn test_minimum_tardiness_sequencing_evaluate_optimal() {
         vec![5, 5, 5, 3, 3],
         vec![(0, 3), (1, 3), (1, 4), (2, 4)],
     );
-    // Schedule: t0=0, t1=1, t3=2, t2=3, t4=4
+    // Lehmer code [0,0,1,0,0] decodes to schedule [0,1,3,2,4]:
+    // available=[0,1,2,3,4] pick idx 0 -> 0; available=[1,2,3,4] pick idx 0 -> 1;
+    // available=[2,3,4] pick idx 1 -> 3; available=[2,4] pick idx 0 -> 2; available=[4] pick idx 0 -> 4.
+    // sigma: task 0 at pos 0, task 1 at pos 1, task 3 at pos 2, task 2 at pos 3, task 4 at pos 4.
     // t0 finishes at 1 <= 5, t1 at 2 <= 5, t3 at 3 <= 3, t2 at 4 <= 5, t4 at 5 > 3 (tardy)
-    let config = vec![0, 1, 3, 2, 4];
+    let config = vec![0, 0, 1, 0, 0];
     assert_eq!(problem.evaluate(&config), SolutionSize::Valid(1));
 }
 
 #[test]
-fn test_minimum_tardiness_sequencing_evaluate_invalid_permutation() {
+fn test_minimum_tardiness_sequencing_evaluate_invalid_lehmer() {
     let problem = MinimumTardinessSequencing::new(3, vec![2, 3, 1], vec![]);
-    // Not a permutation: position 0 used twice
-    assert_eq!(problem.evaluate(&[0, 0, 1]), SolutionSize::Invalid);
+    // dims = [3, 2, 1]; config [0, 2, 0] has 2 >= 2 (second dim), invalid Lehmer code
+    assert_eq!(problem.evaluate(&[0, 2, 0]), SolutionSize::Invalid);
 }
 
 #[test]
 fn test_minimum_tardiness_sequencing_evaluate_out_of_range() {
     let problem = MinimumTardinessSequencing::new(3, vec![2, 3, 1], vec![]);
+    // dims = [3, 2, 1]; config [0, 1, 5] has 5 >= 1 (third dim), out of range
     assert_eq!(problem.evaluate(&[0, 1, 5]), SolutionSize::Invalid);
 }
 
@@ -64,19 +68,21 @@ fn test_minimum_tardiness_sequencing_evaluate_precedence_violation() {
         vec![3, 3, 3],
         vec![(0, 1)], // task 0 must precede task 1
     );
-    // Valid: t0 at pos 0, t1 at pos 1 -> ok
-    assert_eq!(problem.evaluate(&[0, 1, 2]), SolutionSize::Valid(0));
-    // Invalid: t0 at pos 1, t1 at pos 0 -> violates precedence
-    assert_eq!(problem.evaluate(&[1, 0, 2]), SolutionSize::Invalid);
-    // Invalid: t0 at pos 2, t1 at pos 2 -> not a permutation (and would violate precedence)
-    assert_eq!(problem.evaluate(&[2, 2, 0]), SolutionSize::Invalid);
+    // Lehmer [0,0,0] -> schedule [0,1,2] -> sigma [0,1,2]: sigma(0)=0 < sigma(1)=1, valid
+    assert_eq!(problem.evaluate(&[0, 0, 0]), SolutionSize::Valid(0));
+    // Lehmer [1,0,0] -> schedule [1,0,2] -> sigma [1,0,2]: sigma(0)=1 >= sigma(1)=0, violates
+    assert_eq!(problem.evaluate(&[1, 0, 0]), SolutionSize::Invalid);
+    // Lehmer [2,1,0] -> schedule [2,1,0] -> sigma [2,1,0]: sigma(0)=2 >= sigma(1)=1, violates
+    assert_eq!(problem.evaluate(&[2, 1, 0]), SolutionSize::Invalid);
 }
 
 #[test]
 fn test_minimum_tardiness_sequencing_evaluate_all_on_time() {
     let problem = MinimumTardinessSequencing::new(3, vec![3, 3, 3], vec![]);
     // All deadlines are 3, so any permutation of 3 tasks is on time
-    assert_eq!(problem.evaluate(&[0, 1, 2]), SolutionSize::Valid(0));
+    // Lehmer [0,0,0] -> schedule [0,1,2]
+    assert_eq!(problem.evaluate(&[0, 0, 0]), SolutionSize::Valid(0));
+    // Lehmer [2,1,0] -> schedule [2,1,0]
     assert_eq!(problem.evaluate(&[2, 1, 0]), SolutionSize::Valid(0));
 }
 
@@ -86,8 +92,9 @@ fn test_minimum_tardiness_sequencing_evaluate_all_tardy() {
     // Wait: deadlines are usize and d(t)=0 means finish must be <= 0, but finish is at least 1
     // Actually, let's use deadlines that can't be met
     let problem = MinimumTardinessSequencing::new(2, vec![0, 0], vec![]);
+    // Lehmer [0,0] -> schedule [0,1] -> sigma [0,1]
     // pos 0 finishes at 1 > 0 (tardy), pos 1 finishes at 2 > 0 (tardy)
-    assert_eq!(problem.evaluate(&[0, 1]), SolutionSize::Valid(2));
+    assert_eq!(problem.evaluate(&[0, 0]), SolutionSize::Valid(2));
 }
 
 #[test]
@@ -156,4 +163,16 @@ fn test_minimum_tardiness_sequencing_mismatched_deadlines() {
 #[should_panic(expected = "predecessor index 5 out of range")]
 fn test_minimum_tardiness_sequencing_invalid_precedence() {
     MinimumTardinessSequencing::new(3, vec![1, 2, 3], vec![(5, 0)]);
+}
+
+#[test]
+fn test_minimum_tardiness_sequencing_cyclic_precedences() {
+    // Cyclic precedences: 0 -> 1 -> 2 -> 0. No valid schedule exists.
+    let problem = MinimumTardinessSequencing::new(
+        3,
+        vec![3, 3, 3],
+        vec![(0, 1), (1, 2), (2, 0)],
+    );
+    let solver = BruteForce::new();
+    assert!(solver.find_best(&problem).is_none());
 }
