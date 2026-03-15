@@ -34,7 +34,7 @@ GitHub Project board IDs (for `gh project item-edit`):
 
 ## Autonomous Mode
 
-This skill runs **fully autonomously** -- no confirmation prompts, no user questions.
+This skill runs **fully autonomously** except for one case: if a Review pool card links multiple PRs in `CodingThrust/problem-reductions` and the user did not specify which PR to process, STOP and ask the user which PR is the intended target.
 
 ## Steps
 
@@ -46,16 +46,32 @@ gh project item-list 8 --owner CodingThrust --format json --limit 500
 
 Filter items where `status == "Review pool"`. Each item should have an associated PR. Extract the PR number from the item title or linked issue.
 
+Before treating an item as a candidate:
+
+- Only consider PRs in `CodingThrust/problem-reductions` whose GitHub state is `OPEN`.
+- If a Review pool **PR card** points to a PR that is `CLOSED` or `MERGED`, mark it stale and skip it.
+- If a Review pool **issue card** has multiple linked repo PRs, treat the card as **ambiguous**. Do not guess which PR to process.
+- If a Review pool issue card has exactly one linked repo PR, require that PR to be `OPEN`.
+- If a Review pool issue card has no linked repo PRs, resolve the current open PR from the issue number as before.
+
+Stale links must be cleaned up at the PR level (for example, remove outdated `Closes #...` references from superseded PRs) rather than by moving the board card.
+
 #### 0a. Check Copilot Review Status
 
-For each candidate PR, check whether Copilot has already submitted a review:
+For each candidate PR that passed the open/ambiguity checks above, check whether Copilot has already submitted a review:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 gh api repos/$REPO/pulls/$PR/reviews --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | length'
 ```
 
-A PR is **eligible** only if the count is ≥ 1 (Copilot has submitted at least one review). PRs without a Copilot review yet are marked `[waiting for Copilot]` and skipped.
+A PR is **eligible** only if:
+
+1. The PR state is `OPEN`
+2. The Review pool card is unambiguous, or the user explicitly chose the PR from an ambiguous card
+3. The Copilot review count is ≥ 1
+
+PRs without a Copilot review yet are marked `[waiting for Copilot]` and skipped. Closed/merged PRs are marked `[stale closed PR]` and skipped. Mixed-status or multi-PR issue cards are marked `[ambiguous linked PRs]` and require user confirmation before proceeding.
 
 #### 0b. Print the List
 
@@ -65,13 +81,27 @@ Print all Review pool items with their Copilot status:
 Review pool PRs:
   #570  Fix #117: [Model] GraphPartitioning     [copilot reviewed]
   #571  Fix #97: [Rule] BinPacking to ILP       [waiting for Copilot]
+  #170  Fix #108: [Model] LongestCommonSubsequence [stale closed PR]
+  issue #108 [Model] LongestCommonSubsequence   [ambiguous linked PRs]
 ```
 
-**If a specific PR number was provided:** verify it is in the Review pool column. If it is waiting for Copilot, STOP with a message: `PR #N is waiting for Copilot review. Re-run after Copilot has reviewed.`
+**If a specific PR number was provided:** verify it is in the Review pool column and is `OPEN`. If it is waiting for Copilot, STOP with a message: `PR #N is waiting for Copilot review. Re-run after Copilot has reviewed.` If it is closed, STOP with: `PR #N is closed and not eligible for review-pipeline.` A specific PR number counts as the user's disambiguation choice for a multi-PR card.
 
-**If `--all`:** process only eligible (Copilot-reviewed) items in order (lowest PR number first). Skip waiting items.
+**If `--all`:** process only eligible (open, unambiguous, Copilot-reviewed) items in order (lowest PR number first). Skip waiting, stale, and ambiguous items.
 
 **Otherwise:** pick the first eligible item. If no items are eligible, STOP with: `No Review pool PRs have been reviewed by Copilot yet.`
+
+**If the first candidate card is ambiguous:** STOP and ask the user which PR to process. Show short options and recommend the most likely correct one:
+
+```text
+Review pool card [Model] LongestCommonSubsequence links multiple repo PRs:
+1. PR #170 — CLOSED — Superseded: Add LongestCommonSubsequence model
+2. PR #173 — OPEN — Fix #109: Add LCS to MaximumIndependentSet reduction  (Recommended)
+
+Recommendation rule:
+- Prefer the only OPEN repo PR when all others are closed or merged.
+- If multiple repo PRs are OPEN, prefer the one whose title/body most directly matches the card's current work, and say that the card still needs stale-link cleanup.
+```
 
 ### 0g. Claim: Move to "Under review"
 
@@ -143,10 +173,10 @@ git merge origin/main --no-edit
 Copilot review is guaranteed to exist (verified in Step 0). Fetch the comments:
 
 ```bash
-COMMENTS=$(gh api repos/$REPO/pulls/$PR/comments --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")]')
+COMMENTS=$(python3 scripts/pipeline_pr.py comments --repo "$REPO" --pr "$PR" --format json)
 ```
 
-If there are actionable comments: invoke `/fix-pr` to address them, then push:
+Inspect the `copilot_inline_comments` array in `COMMENTS`. If there are actionable comments: invoke `/fix-pr` to address them, then push:
 
 ```bash
 git push
@@ -156,55 +186,12 @@ If Copilot approved with no actionable comments: skip to next step.
 
 ### 2a. Check Issue Comments and Human PR Reviews
 
-Extract the linked issue number from the PR title (pattern: `Fix #N:`):
-
-```bash
-ISSUE=$(gh pr view $PR --json title --jq .title | grep -oP '(?<=Fix #)\d+')
-```
-
-Fetch all comment sources:
-
-```bash
-# 1. Linked issue comments (from contributors, excluding bots)
-if [ -n "$ISSUE" ]; then
-    gh api repos/$REPO/issues/$ISSUE/comments | python3 -c "
-import sys,json
-comments = [c for c in json.load(sys.stdin) if not c['user']['login'].endswith('[bot]')]
-print(f'=== Issue #{sys.argv[1]} comments: {len(comments)} ===')
-for c in comments:
-    print(f'[{c[\"user\"][\"login\"]}] {c[\"body\"][:300]}')
-    print('---')
-" "$ISSUE"
-fi
-
-# 2. Human PR review comments (inline, excluding Copilot)
-gh api repos/$REPO/pulls/$PR/comments | python3 -c "
-import sys,json
-comments = [c for c in json.load(sys.stdin) if not c['user']['login'].endswith('[bot]')]
-print(f'=== Human PR inline comments: {len(comments)} ===')
-for c in comments:
-    line = c.get('line') or c.get('original_line') or '?'
-    print(f'[{c[\"user\"][\"login\"]}] {c[\"path\"]}:{line} — {c[\"body\"][:300]}')
-"
-
-# 3. Human PR conversation comments (general discussion, excluding bots)
-gh api repos/$REPO/issues/$PR/comments | python3 -c "
-import sys,json
-comments = [c for c in json.load(sys.stdin) if not c['user']['login'].endswith('[bot]')]
-print(f'=== Human PR conversation comments: {len(comments)} ===')
-for c in comments:
-    print(f'[{c[\"user\"][\"login\"]}] {c[\"body\"][:300]}')
-"
-
-# 4. Human review-level comments (top-level review body)
-gh api repos/$REPO/pulls/$PR/reviews | python3 -c "
-import sys,json
-reviews = [r for r in json.load(sys.stdin) if not r['user']['login'].endswith('[bot]') and r.get('body')]
-print(f'=== Human reviews: {len(reviews)} ===')
-for r in reviews:
-    print(f'[{r[\"user\"][\"login\"]}] {r[\"state\"]}: {r[\"body\"][:300]}')
-"
-```
+Reuse the `COMMENTS` JSON from Step 2. It already includes:
+- `linked_issue_number`
+- `human_linked_issue_comments`
+- `human_inline_comments`
+- `human_issue_comments`
+- `human_reviews`
 
 For each actionable comment found:
 
@@ -255,26 +242,13 @@ For each retry:
 
 1. **Wait for CI to complete** (poll every 30s, up to 15 minutes):
    ```bash
-   for i in $(seq 1 30); do
-       sleep 30
-       HEAD_SHA=$(gh api repos/$REPO/pulls/$PR | python3 -c "import sys,json; print(json.load(sys.stdin)['head']['sha'])")
-       STATUS=$(gh api repos/$REPO/commits/$HEAD_SHA/check-runs | python3 -c "
-   import sys,json
-   runs = json.load(sys.stdin)['check_runs']
-   if not runs:
-       print('PENDING')
-   else:
-       failed = [r['name'] for r in runs if r.get('conclusion') not in ('success', 'skipped', None)]
-       pending = [r['name'] for r in runs if r.get('conclusion') is None and r['status'] != 'completed']
-       if pending:
-           print('PENDING')
-       elif failed:
-           print('FAILED')
-       else:
-           print('GREEN')
-   ")
-       if [ "$STATUS" != "PENDING" ]; then break; fi
-   done
+   CI=$(python3 scripts/pipeline_pr.py wait-ci --repo "$REPO" --pr "$PR" --timeout 900 --interval 30 --format json)
+   STATUS=$(printf '%s\n' "$CI" | python3 -c "
+import sys,json
+state = json.load(sys.stdin)['state']
+mapping = {'success': 'GREEN', 'failure': 'FAILED', 'timeout': 'FAILED', 'pending': 'PENDING'}
+print(mapping.get(state, 'FAILED'))
+")
    ```
 
    - If `GREEN` on the **first** iteration (before any fix-pr): skip the fix loop, done.
@@ -354,6 +328,8 @@ Completed: 2/2 | All moved to Final review
 | Mistake | Fix |
 |---------|-----|
 | PR not in Review pool column | Verify status before processing; STOP if not Review pool |
+| Processing a closed PR from a stale issue card | Require PR state `OPEN`; skip stale closed PRs |
+| Guessing on an issue card with multiple linked repo PRs | Stop, show options to the user, and recommend the most likely correct OPEN PR |
 | Picking a PR before Copilot has reviewed | Check `pulls/$PR/reviews` for copilot-pull-request-reviewer[bot]; skip if absent |
 | Missing project scopes | Run `gh auth refresh -s read:project,project` |
 | Skipping review-implementation | Always run structural completeness check in Step 2b — it catches gaps Copilot misses (paper entries, CLI registration, trait_consistency) |

@@ -1,0 +1,228 @@
+#!/usr/bin/env python3
+import unittest
+
+from pipeline_pr import (
+    build_snapshot,
+    extract_codecov_summary,
+    extract_linked_issue_number,
+    summarize_check_runs,
+    summarize_comments,
+    wait_for_ci,
+)
+
+
+def make_inline_comment(
+    login: str,
+    *,
+    body: str = "comment",
+    path: str = "src/lib.rs",
+    line: int = 7,
+) -> dict:
+    return {
+        "user": {"login": login},
+        "body": body,
+        "path": path,
+        "line": line,
+        "original_line": line,
+    }
+
+
+def make_review(
+    login: str,
+    *,
+    body: str = "review body",
+    state: str = "COMMENTED",
+) -> dict:
+    return {
+        "user": {"login": login},
+        "body": body,
+        "state": state,
+    }
+
+
+def make_issue_comment(login: str, *, body: str = "discussion") -> dict:
+    return {
+        "user": {"login": login},
+        "body": body,
+    }
+
+
+def make_check_run(
+    name: str,
+    *,
+    status: str = "completed",
+    conclusion: str | None = "success",
+) -> dict:
+    return {
+        "name": name,
+        "status": status,
+        "conclusion": conclusion,
+    }
+
+
+class PipelinePrHelpersTests(unittest.TestCase):
+    def test_extract_linked_issue_number_prefers_body_over_title(self) -> None:
+        linked_issue = extract_linked_issue_number(
+            "Fix #117: Add GraphPartitioning model",
+            "This supersedes older work and closes #42.",
+        )
+        self.assertEqual(linked_issue, 42)
+
+    def test_extract_linked_issue_number_falls_back_to_title(self) -> None:
+        linked_issue = extract_linked_issue_number(
+            "Fix #117: Add GraphPartitioning model",
+            "No explicit closing keyword here.",
+        )
+        self.assertEqual(linked_issue, 117)
+
+    def test_summarize_comments_splits_human_copilot_and_codecov_sources(self) -> None:
+        summary = summarize_comments(
+            inline_comments=[
+                make_inline_comment("copilot-pull-request-reviewer[bot]"),
+                make_inline_comment("alice"),
+            ],
+            reviews=[
+                make_review("bob", body="Please add tests"),
+                make_review("copilot-pull-request-reviewer[bot]", body="bot review"),
+                make_review("carol", body=""),
+            ],
+            issue_comments=[
+                make_issue_comment("dave", body="Please update docs"),
+                make_issue_comment("codecov[bot]", body="## [Codecov] Patch coverage is 82%"),
+            ],
+            linked_issue_comments=[
+                make_issue_comment("erin", body="The literature citation is important"),
+                make_issue_comment("deploy-bot[bot]", body="automated deployment note"),
+            ],
+        )
+
+        self.assertEqual(summary["counts"]["inline_comments"], 2)
+        self.assertEqual(summary["counts"]["copilot_inline_comments"], 1)
+        self.assertEqual(summary["counts"]["human_inline_comments"], 1)
+        self.assertEqual(summary["counts"]["human_reviews"], 1)
+        self.assertEqual(summary["counts"]["human_issue_comments"], 1)
+        self.assertEqual(summary["counts"]["human_linked_issue_comments"], 1)
+        self.assertEqual(summary["counts"]["codecov_comments"], 1)
+
+    def test_extract_codecov_summary_parses_latest_comment_and_filepaths(self) -> None:
+        summary = extract_codecov_summary(
+            [
+                make_issue_comment("alice", body="looks fine"),
+                make_issue_comment(
+                    "codecov[bot]",
+                    body=(
+                        "## [Codecov]\n"
+                        "Patch coverage: `84.21%`\n"
+                        "Project coverage is `91.30%`\n"
+                        "https://codecov.io/gh/CodingThrust/problem-reductions?"
+                        "filepath=src%2Fmodels%2Fgraph%2Ffoo.rs&line=17\n"
+                        "https://codecov.io/gh/CodingThrust/problem-reductions?"
+                        "filepath=src%2Fmodels%2Fgraph%2Ffoo.rs&line=21\n"
+                        "https://codecov.io/gh/CodingThrust/problem-reductions?"
+                        "filepath=src%2Frules%2Ffoo_bar.rs&line=8\n"
+                    ),
+                ),
+            ]
+        )
+
+        self.assertTrue(summary["found"])
+        self.assertEqual(summary["patch_coverage"], 84.21)
+        self.assertEqual(summary["project_coverage"], 91.30)
+        self.assertEqual(
+            summary["filepaths"],
+            [
+                "src/models/graph/foo.rs",
+                "src/rules/foo_bar.rs",
+            ],
+        )
+
+    def test_summarize_check_runs_reports_overall_state(self) -> None:
+        self.assertEqual(
+            summarize_check_runs({"check_runs": [make_check_run("test", status="queued", conclusion=None)]})["state"],
+            "pending",
+        )
+        self.assertEqual(
+            summarize_check_runs({"check_runs": [make_check_run("test", conclusion="failure")]})["state"],
+            "failure",
+        )
+        self.assertEqual(
+            summarize_check_runs(
+                {
+                    "check_runs": [
+                        make_check_run("fmt"),
+                        make_check_run("coverage", conclusion="neutral"),
+                    ]
+                }
+            )["state"],
+            "success",
+        )
+
+    def test_build_snapshot_includes_linked_issue_ci_and_codecov(self) -> None:
+        snapshot = build_snapshot(
+            {
+                "number": 570,
+                "title": "Fix #117: Add GraphPartitioning model",
+                "body": "Closes #117",
+                "state": "OPEN",
+                "url": "https://github.com/CodingThrust/problem-reductions/pull/570",
+                "headRefName": "feature/graph-partitioning",
+                "baseRefName": "main",
+                "mergeable": "MERGEABLE",
+                "headRefOid": "abc123",
+                "labels": [{"name": "model"}],
+                "files": [{"path": "src/models/graph/graph_partitioning.rs"}],
+                "commits": [{"oid": "abc123"}, {"oid": "def456"}],
+                "additions": 120,
+                "deletions": 7,
+            },
+            linked_issue_number=117,
+            linked_issue={
+                "number": 117,
+                "title": "[Model] GraphPartitioning",
+                "state": "OPEN",
+            },
+            ci_summary={"state": "success", "total": 3, "failing": 0, "pending": 0},
+            codecov_summary={"found": True, "patch_coverage": 84.21, "filepaths": ["src/models/graph/graph_partitioning.rs"]},
+        )
+
+        self.assertEqual(snapshot["number"], 570)
+        self.assertEqual(snapshot["linked_issue_number"], 117)
+        self.assertEqual(snapshot["linked_issue"]["title"], "[Model] GraphPartitioning")
+        self.assertEqual(snapshot["ci"]["state"], "success")
+        self.assertEqual(snapshot["codecov"]["patch_coverage"], 84.21)
+        self.assertEqual(snapshot["counts"]["files"], 1)
+        self.assertEqual(snapshot["counts"]["commits"], 2)
+
+    def test_wait_for_ci_polls_until_terminal_state(self) -> None:
+        summaries = [
+            {"state": "pending", "total": 2, "pending": 1, "failing": 0},
+            {"state": "pending", "total": 2, "pending": 1, "failing": 0},
+            {"state": "success", "total": 2, "pending": 0, "failing": 0},
+        ]
+        sleeps: list[float] = []
+        now = [0.0]
+
+        def fake_fetcher() -> dict:
+            return summaries.pop(0)
+
+        def fake_monotonic() -> float:
+            return now[0]
+
+        def fake_sleep(seconds: float) -> None:
+            sleeps.append(seconds)
+            now[0] += seconds
+
+        result = wait_for_ci(
+            fake_fetcher,
+            timeout_seconds=30,
+            interval_seconds=5,
+            monotonic_fn=fake_monotonic,
+            sleep_fn=fake_sleep,
+        )
+
+        self.assertEqual(result["state"], "success")
+        self.assertEqual(sleeps, [5, 5])
+
+
+if __name__ == "__main__":
+    unittest.main()

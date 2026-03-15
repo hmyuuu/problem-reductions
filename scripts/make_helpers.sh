@@ -43,29 +43,46 @@ run_agent() {
 
 # --- Project board ---
 
-project_items_json() {
-    gh project item-list 8 --owner CodingThrust --format json --limit 500
-}
-
 # Detect the next eligible item and preserve retryable state in a queue.
 #   poll_project_items <mode> <state-file> [repo]
 poll_project_items() {
     mode=$1
     state_file=$2
     repo=${3-}
-    board_json=$(project_items_json) || return $?
 
     if [ -n "$repo" ]; then
-        printf '%s\n' "$board_json" | python3 scripts/project_board_poll.py poll "$mode" "$state_file" --repo "$repo"
+        python3 scripts/pipeline_board.py next "$mode" "$state_file" --repo "$repo"
     else
-        printf '%s\n' "$board_json" | python3 scripts/project_board_poll.py poll "$mode" "$state_file"
+        python3 scripts/pipeline_board.py next "$mode" "$state_file"
     fi
 }
 
 ack_polled_item() {
     state_file=$1
     item_id=$2
-    python3 scripts/project_board_poll.py ack "$state_file" "$item_id"
+    python3 scripts/pipeline_board.py ack "$state_file" "$item_id"
+}
+
+move_board_item() {
+    item_id=$1
+    status=$2
+    python3 scripts/pipeline_board.py move "$item_id" "$status"
+}
+
+# --- PR helpers ---
+
+pr_snapshot() {
+    repo=$1
+    pr=$2
+    python3 scripts/pipeline_pr.py snapshot --repo "$repo" --pr "$pr" --format json
+}
+
+pr_wait_ci() {
+    repo=$1
+    pr=$2
+    timeout=${3:-900}
+    interval=${4:-30}
+    python3 scripts/pipeline_pr.py wait-ci --repo "$repo" --pr "$pr" --timeout "$timeout" --interval "$interval" --format json
 }
 
 # Poll a board column and dispatch a make target when new items appear.

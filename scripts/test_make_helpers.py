@@ -55,6 +55,134 @@ class MakeHelpersTests(unittest.TestCase):
             ],
         )
 
+    def test_poll_project_items_uses_pipeline_board_cli(self) -> None:
+        if shutil.which("dash") is None:
+            self.skipTest("dash is not installed")
+
+        proc = subprocess.run(
+            [
+                "dash",
+                "-c",
+                (
+                    ". scripts/make_helpers.sh; "
+                    "python3() { printf '%s\\n' \"$@\"; }; "
+                    "poll_project_items ready /tmp/state.json"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.splitlines(),
+            [
+                "scripts/pipeline_board.py",
+                "next",
+                "ready",
+                "/tmp/state.json",
+            ],
+        )
+
+    def test_move_board_item_uses_pipeline_board_cli(self) -> None:
+        if shutil.which("dash") is None:
+            self.skipTest("dash is not installed")
+
+        proc = subprocess.run(
+            [
+                "dash",
+                "-c",
+                (
+                    ". scripts/make_helpers.sh; "
+                    "python3() { printf '%s\\n' \"$@\"; }; "
+                    "move_board_item PVTI_demo final-review"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.splitlines(),
+            [
+                "scripts/pipeline_board.py",
+                "move",
+                "PVTI_demo",
+                "final-review",
+            ],
+        )
+
+    def test_pr_snapshot_uses_pipeline_pr_cli(self) -> None:
+        if shutil.which("dash") is None:
+            self.skipTest("dash is not installed")
+
+        proc = subprocess.run(
+            [
+                "dash",
+                "-c",
+                (
+                    ". scripts/make_helpers.sh; "
+                    "python3() { printf '%s\\n' \"$@\"; }; "
+                    "pr_snapshot CodingThrust/problem-reductions 570"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.splitlines(),
+            [
+                "scripts/pipeline_pr.py",
+                "snapshot",
+                "--repo",
+                "CodingThrust/problem-reductions",
+                "--pr",
+                "570",
+                "--format",
+                "json",
+            ],
+        )
+
+    def test_pr_wait_ci_uses_pipeline_pr_cli(self) -> None:
+        if shutil.which("dash") is None:
+            self.skipTest("dash is not installed")
+
+        proc = subprocess.run(
+            [
+                "dash",
+                "-c",
+                (
+                    ". scripts/make_helpers.sh; "
+                    "python3() { printf '%s\\n' \"$@\"; }; "
+                    "pr_wait_ci CodingThrust/problem-reductions 570 1200 15"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.splitlines(),
+            [
+                "scripts/pipeline_pr.py",
+                "wait-ci",
+                "--repo",
+                "CodingThrust/problem-reductions",
+                "--pr",
+                "570",
+                "--timeout",
+                "1200",
+                "--interval",
+                "15",
+                "--format",
+                "json",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

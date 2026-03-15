@@ -1,6 +1,6 @@
 # Makefile for problemreductions
 
-.PHONY: help build test mcp-test fmt clippy doc mdbook paper examples clean coverage rust-export compare qubo-testdata export-schemas release run-plan run-issue run-pipeline run-pipeline-forever run-review run-review-forever diagrams jl-testdata cli cli-demo copilot-review
+.PHONY: help build test mcp-test fmt clippy doc mdbook paper examples clean coverage rust-export compare qubo-testdata export-schemas release run-plan run-issue run-pipeline run-pipeline-forever run-review run-review-forever board-next board-ack board-move pr-context pr-wait-ci diagrams jl-testdata cli cli-demo copilot-review
 
 RUNNER ?= codex
 CLAUDE_MODEL ?= opus
@@ -37,6 +37,11 @@ help:
 	@echo "  run-pipeline-forever - Loop: poll Ready column for new issues, run-pipeline when new ones appear"
 	@echo "  run-review [N=<number>] - Pick PR from Review pool, fix comments/CI, run agentic tests"
 	@echo "  run-review-forever - Loop: poll Review pool for Copilot-reviewed PRs, run-review when new ones appear"
+	@echo "  board-next MODE=<ready|review> - Get the next eligible queued project item"
+	@echo "  board-ack MODE=<ready|review> ITEM=<id> - Acknowledge a queued project item"
+	@echo "  board-move ITEM=<id> STATUS=<status> - Move a project item to a named status"
+	@echo "  pr-context PR=<number> [REPO=<owner/repo>] - Fetch structured PR snapshot JSON"
+	@echo "  pr-wait-ci PR=<number> [REPO=<owner/repo>] - Poll CI until terminal state and print JSON"
 	@echo "  copilot-review - Request Copilot code review on current PR"
 	@echo ""
 	@echo "  Set RUNNER=claude to use Claude instead of Codex (default: codex)"
@@ -386,6 +391,72 @@ run-pipeline:
 run-pipeline-forever:
 	@. scripts/make_helpers.sh; \
 	MAKE=$(MAKE) watch_and_dispatch ready run-pipeline "Ready issues"
+
+# Get the next eligible board item from the scripted queue logic
+# Usage: make board-next MODE=ready
+#        make board-next MODE=review REPO=CodingThrust/problem-reductions
+#        STATE_FILE=/tmp/custom.json make board-next MODE=ready
+board-next:
+	@if [ -z "$(MODE)" ]; then \
+		echo "MODE=ready|review is required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	state_file=$${STATE_FILE:-/tmp/problemreductions-$(MODE)-state.json}; \
+	if [ "$(MODE)" = "review" ]; then \
+		repo=$${REPO:-$$(gh repo view --json nameWithOwner --jq .nameWithOwner)}; \
+		poll_project_items "$(MODE)" "$$state_file" "$$repo"; \
+	else \
+		poll_project_items "$(MODE)" "$$state_file"; \
+	fi
+
+# Advance a scripted board queue after an item is processed
+# Usage: make board-ack MODE=ready ITEM=PVTI_xxx
+#        STATE_FILE=/tmp/custom.json make board-ack MODE=review ITEM=PVTI_xxx
+board-ack:
+	@if [ -z "$(MODE)" ] || [ -z "$(ITEM)" ]; then \
+		echo "MODE=ready|review and ITEM=<project-item-id> are required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	state_file=$${STATE_FILE:-/tmp/problemreductions-$(MODE)-state.json}; \
+	ack_polled_item "$$state_file" "$(ITEM)"
+
+# Move a project board item to a named status through the shared board script
+# Usage: make board-move ITEM=PVTI_xxx STATUS=final-review
+board-move:
+	@if [ -z "$(ITEM)" ] || [ -z "$(STATUS)" ]; then \
+		echo "ITEM=<project-item-id> and STATUS=<backlog|ready|review-pool|final-review|done> are required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	move_board_item "$(ITEM)" "$(STATUS)"
+
+# Fetch structured PR snapshot JSON from the shared helper
+# Usage: make pr-context PR=570
+#        make pr-context PR=570 REPO=CodingThrust/problem-reductions
+pr-context:
+	@if [ -z "$(PR)" ]; then \
+		echo "PR=<number> is required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	repo=$${REPO:-$$(gh repo view --json nameWithOwner --jq .nameWithOwner)}; \
+	pr_snapshot "$$repo" "$(PR)"
+
+# Poll CI for a PR until it reaches a terminal state
+# Usage: make pr-wait-ci PR=570
+#        make pr-wait-ci PR=570 TIMEOUT=1200 INTERVAL=15
+pr-wait-ci:
+	@if [ -z "$(PR)" ]; then \
+		echo "PR=<number> is required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	repo=$${REPO:-$$(gh repo view --json nameWithOwner --jq .nameWithOwner)}; \
+	timeout=$${TIMEOUT:-900}; \
+	interval=$${INTERVAL:-30}; \
+	pr_wait_ci "$$repo" "$(PR)" "$$timeout" "$$interval"
 
 # Usage: make run-review              (picks next Review pool PR automatically)
 #        make run-review N=570        (processes specific PR)
