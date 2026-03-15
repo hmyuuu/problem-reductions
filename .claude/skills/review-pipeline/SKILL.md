@@ -40,58 +40,66 @@ This skill runs **fully autonomously** except for one case: if a Review pool car
 
 ### 0. Discover Review pool Items
 
-```bash
-gh project item-list 8 --owner CodingThrust --format json --limit 500
-```
-
-Filter items where `status == "Review pool"`. Each item should have an associated PR. Extract the PR number from the item title or linked issue.
-
-Before treating an item as a candidate:
-
-- Only consider PRs in `CodingThrust/problem-reductions` whose GitHub state is `OPEN`.
-- If a Review pool **PR card** points to a PR that is `CLOSED` or `MERGED`, mark it stale and skip it.
-- If a Review pool **issue card** has multiple linked repo PRs, treat the card as **ambiguous**. Do not guess which PR to process.
-- If a Review pool issue card has exactly one linked repo PR, require that PR to be `OPEN`.
-- If a Review pool issue card has no linked repo PRs, resolve the current open PR from the issue number as before.
-
-Stale links must be cleaned up at the PR level (for example, remove outdated `Closes #...` references from superseded PRs) rather than by moving the board card.
-
-#### 0a. Check Copilot Review Status
-
-For each candidate PR that passed the open/ambiguity checks above, check whether Copilot has already submitted a review:
+Collect the scripted candidate list first:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-gh api repos/$REPO/pulls/$PR/reviews --jq '[.[] | select(.user.login == "copilot-pull-request-reviewer[bot]")] | length'
+CANDIDATES=$(python3 scripts/pipeline_board.py list review --repo "$REPO" --format json)
 ```
 
-A PR is **eligible** only if:
+Inspect `CANDIDATES["items"]`. Each item includes:
+- `item_id`, `title`, `issue_number`, `pr_number`, `eligibility`, `reason`
+- for ambiguous cards: `linked_repo_prs` and `recommendation`
 
-1. The PR state is `OPEN`
-2. The Review pool card is unambiguous, or the user explicitly chose the PR from an ambiguous card
-3. The Copilot review count is ≥ 1
-
-PRs without a Copilot review yet are marked `[waiting for Copilot]` and skipped. Closed/merged PRs are marked `[stale closed PR]` and skipped. Mixed-status or multi-PR issue cards are marked `[ambiguous linked PRs]` and require user confirmation before proceeding.
+The scripted `eligibility` values are:
+- `eligible`
+- `waiting-for-copilot`
+- `stale-closed-pr`
+- `ambiguous-linked-prs`
+- `no-open-pr`
 
 #### 0b. Print the List
 
-Print all Review pool items with their Copilot status:
+Print the candidate list using the scripted eligibility:
 
 ```
 Review pool PRs:
-  #570  Fix #117: [Model] GraphPartitioning     [copilot reviewed]
-  #571  Fix #97: [Rule] BinPacking to ILP       [waiting for Copilot]
-  #170  Fix #108: [Model] LongestCommonSubsequence [stale closed PR]
-  issue #108 [Model] LongestCommonSubsequence   [ambiguous linked PRs]
+  #570  Fix #117: [Model] GraphPartitioning     [eligible]
+  #571  Fix #97: [Rule] BinPacking to ILP       [waiting-for-copilot]
+  #170  Fix #108: [Model] LongestCommonSubsequence [stale-closed-pr]
+  issue #108 [Model] LongestCommonSubsequence   [ambiguous-linked-prs]
 ```
 
-**If a specific PR number was provided:** verify it is in the Review pool column and is `OPEN`. If it is waiting for Copilot, STOP with a message: `PR #N is waiting for Copilot review. Re-run after Copilot has reviewed.` If it is closed, STOP with: `PR #N is closed and not eligible for review-pipeline.` A specific PR number counts as the user's disambiguation choice for a multi-PR card.
+**If a specific PR number was provided:** find the matching entry in `CANDIDATES["items"]` by `pr_number`. If its `eligibility` is:
+- `eligible`: continue
+- `waiting-for-copilot`: STOP with `PR #N is waiting for Copilot review. Re-run after Copilot has reviewed.`
+- `stale-closed-pr`: STOP with `PR #N is closed and not eligible for review-pipeline.`
+- `ambiguous-linked-prs`: this specific PR number counts as the user's disambiguation choice. Use that PR number, but keep the card marked as ambiguous until stale links are cleaned up.
+- missing from the list: STOP with `PR #N is not currently in the Review pool candidate set.`
 
-**If `--all`:** process only eligible (open, unambiguous, Copilot-reviewed) items in order (lowest PR number first). Skip waiting, stale, and ambiguous items.
+After validation, extract `ITEM_ID`, `TITLE`, and `ISSUE` from the matching candidate entry in `CANDIDATES["items"]`, and set `PR` to the chosen PR number.
 
-**Otherwise:** pick the first eligible item. If no items are eligible, STOP with: `No Review pool PRs have been reviewed by Copilot yet.`
+**If `--all`:** process only entries where `eligibility == "eligible"` in order (lowest PR number first). Skip waiting, stale, no-open-pr, and ambiguous items.
 
-**If the first candidate card is ambiguous:** STOP and ask the user which PR to process. Show short options and recommend the most likely correct one:
+**Otherwise:** select the next eligible item through the scripted queue:
+
+```bash
+STATE_FILE=/tmp/problemreductions-review-selection.json
+NEXT=$(python3 scripts/pipeline_board.py next review "$STATE_FILE" --repo "$REPO" --format json)
+```
+
+If the command exits with status 1, STOP with: `No Review pool PRs are currently eligible for review-pipeline.`
+
+Extract the board item and PR metadata from `NEXT`:
+
+```bash
+ITEM_ID=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['item_id'])")
+PR=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['pr_number'] or data['number'])")
+TITLE=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['title'])")
+ISSUE=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['issue_number'] or '')")
+```
+
+**If `CANDIDATES["items"]` contains an ambiguous card that you need to resolve manually:** STOP and ask the user which PR to process. Show short options from `linked_repo_prs` and recommend `recommendation` when present:
 
 ```text
 Review pool card [Model] LongestCommonSubsequence links multiple repo PRs:

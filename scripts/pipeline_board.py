@@ -107,6 +107,23 @@ def fetch_pr_state(repo: str, pr_number: int) -> str:
     ).strip()
 
 
+def fetch_pr_info(repo: str, pr_number: int) -> dict:
+    data = json.loads(
+        run_gh(
+            "pr",
+            "view",
+            str(pr_number),
+            "--repo",
+            repo,
+            "--json",
+            "number,state,title,url",
+        )
+    )
+    if not isinstance(data, dict):
+        raise ValueError(f"Unexpected PR payload for #{pr_number}: {data!r}")
+    return data
+
+
 def resolve_issue_pr(repo: str, issue_number: int) -> int | None:
     data = json.loads(
         run_gh(
@@ -302,6 +319,142 @@ def review_entries(
                 pr_number=pr_number,
             )
     return entries
+
+
+def review_candidates(
+    board_data: dict,
+    repo: str,
+    review_fetcher: Callable[[str, int], list[dict]],
+    pr_resolver: Callable[[str, int], int | None] | None,
+    pr_info_fetcher: Callable[[str, int], dict],
+) -> list[dict]:
+    candidates = []
+    for item in board_data.get("items", []):
+        if item.get("status") != STATUS_REVIEW_POOL:
+            continue
+
+        content = item.get("content") or {}
+        item_type = content.get("type")
+        number = content.get("number")
+        if number is None:
+            continue
+
+        base_entry = build_entry(item, number=0)
+        base_entry["item_id"] = item_identity(item)
+        issue_number = int(number) if item_type == "Issue" else None
+
+        if item_type == "PullRequest":
+            pr_number = int(number)
+            pr_info = pr_info_fetcher(repo, pr_number)
+            state = pr_info.get("state")
+            base_entry.update({"number": pr_number, "pr_number": pr_number})
+            if state != "OPEN":
+                base_entry.update(
+                    {
+                        "eligibility": "stale-closed-pr",
+                        "reason": f"linked PR #{pr_number} is {state}",
+                    }
+                )
+                candidates.append(base_entry)
+                continue
+
+            reviews = review_fetcher(repo, pr_number)
+            if has_copilot_review(reviews):
+                base_entry.update({"eligibility": "eligible", "reason": "copilot reviewed"})
+            else:
+                base_entry.update(
+                    {
+                        "eligibility": "waiting-for-copilot",
+                        "reason": f"open PR #{pr_number} waiting for Copilot review",
+                    }
+                )
+            candidates.append(base_entry)
+            continue
+
+        if item_type != "Issue":
+            continue
+
+        base_entry["issue_number"] = issue_number
+        linked_numbers = linked_pr_numbers(item, repo)
+        if len(linked_numbers) > 1:
+            linked_infos = [pr_info_fetcher(repo, pr_number) for pr_number in linked_numbers]
+            open_numbers = [
+                int(info["number"])
+                for info in linked_infos
+                if str(info.get("state")).upper() == "OPEN"
+            ]
+            recommendation = open_numbers[0] if len(open_numbers) == 1 else None
+            base_entry.update(
+                {
+                    "number": recommendation or int(linked_infos[0]["number"]),
+                    "pr_number": recommendation,
+                    "eligibility": "ambiguous-linked-prs",
+                    "reason": "multiple linked repo PRs require confirmation",
+                    "recommendation": recommendation,
+                    "linked_repo_prs": [
+                        {
+                            "number": int(info["number"]),
+                            "state": str(info.get("state")),
+                            "title": info.get("title"),
+                        }
+                        for info in linked_infos
+                    ],
+                }
+            )
+            candidates.append(base_entry)
+            continue
+
+        if len(linked_numbers) == 1:
+            pr_number = linked_numbers[0]
+            pr_info = pr_info_fetcher(repo, pr_number)
+            state = pr_info.get("state")
+            base_entry.update({"number": pr_number, "pr_number": pr_number})
+            if state != "OPEN":
+                base_entry.update(
+                    {
+                        "eligibility": "stale-closed-pr",
+                        "reason": f"linked PR #{pr_number} is {state}",
+                    }
+                )
+                candidates.append(base_entry)
+                continue
+        else:
+            if pr_resolver is None:
+                raise ValueError("review candidate listing requires pr_resolver for issue cards without linked PRs")
+            pr_number = pr_resolver(repo, issue_number)
+            if pr_number is None:
+                base_entry.update(
+                    {
+                        "number": issue_number,
+                        "pr_number": None,
+                        "eligibility": "no-open-pr",
+                        "reason": f"issue #{issue_number} has no open PR",
+                    }
+                )
+                candidates.append(base_entry)
+                continue
+            base_entry.update({"number": pr_number, "pr_number": pr_number})
+
+        reviews = review_fetcher(repo, pr_number)
+        if has_copilot_review(reviews):
+            base_entry.update({"eligibility": "eligible", "reason": "copilot reviewed"})
+        else:
+            base_entry.update(
+                {
+                    "eligibility": "waiting-for-copilot",
+                    "reason": f"open PR #{pr_number} waiting for Copilot review",
+                }
+            )
+        candidates.append(base_entry)
+
+    return sorted(
+        candidates,
+        key=lambda entry: (
+            entry["pr_number"] is None,
+            entry["number"],
+            entry["item_id"],
+        ),
+    )
 
 
 def final_review_entries(
@@ -727,6 +880,24 @@ def print_next_item(
     return 0
 
 
+def print_candidate_list(
+    mode: str,
+    items: list[dict],
+    *,
+    fmt: str = "text",
+) -> int:
+    if fmt == "json":
+        print(json.dumps({"mode": mode, "items": items}))
+        return 0
+
+    for item in items:
+        number = item.get("pr_number") or item.get("issue_number") or item["number"]
+        title = item.get("title") or ""
+        eligibility = item.get("eligibility") or ""
+        print(f"{item['item_id']}\t{number}\t{eligibility}\t{title}")
+    return 0
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Project board automation helpers.")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -744,6 +915,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ack_parser = subparsers.add_parser("ack")
     ack_parser.add_argument("state_file", type=Path)
     ack_parser.add_argument("item_id")
+
+    list_parser = subparsers.add_parser("list")
+    list_parser.add_argument("mode", choices=["review"])
+    list_parser.add_argument("--repo", required=True)
+    list_parser.add_argument("--owner", default="CodingThrust")
+    list_parser.add_argument("--project-number", type=int, default=8)
+    list_parser.add_argument("--limit", type=int, default=500)
+    list_parser.add_argument("--format", choices=["text", "json"], default="text")
 
     move_parser = subparsers.add_parser("move")
     move_parser.add_argument("item_id")
@@ -769,6 +948,19 @@ def main(argv: list[str] | None = None) -> int:
             field_id=args.field_id,
         )
         return 0
+
+    if args.command == "list":
+        board_data = fetch_board_items(args.owner, args.project_number, args.limit)
+        if args.mode == "review":
+            items = review_candidates(
+                board_data,
+                args.repo,
+                fetch_pr_reviews,
+                resolve_issue_pr,
+                fetch_pr_info,
+            )
+            return print_candidate_list(args.mode, items, fmt=args.format)
+        raise SystemExit(f"Unsupported list mode: {args.mode}")
 
     if args.mode in {"review", "final-review"} and not args.repo:
         raise SystemExit(f"--repo is required in {args.mode} mode")

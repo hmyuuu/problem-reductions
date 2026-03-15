@@ -19,6 +19,7 @@ from pipeline_board import (
     normalize_status_name,
     print_next_item,
     process_snapshot,
+    review_candidates,
     select_next_entry,
 )
 
@@ -421,6 +422,112 @@ class PipelineBoardOutputTests(unittest.TestCase):
                 "title": "[Model] MinimumFeedbackVertexSet",
             },
         )
+
+
+class PipelineBoardReviewCandidateTests(unittest.TestCase):
+    def test_review_candidates_report_ambiguous_issue_cards(self) -> None:
+        def fake_review_fetcher(repo: str, pr_number: int) -> list[dict]:
+            raise AssertionError("ambiguous cards should not fetch reviews")
+
+        def fake_pr_resolver(repo: str, issue_number: int) -> int | None:
+            raise AssertionError("ambiguous cards should not resolve by issue search")
+
+        def fake_pr_info_fetcher(repo: str, pr_number: int) -> dict:
+            self.assertEqual(repo, "CodingThrust/problem-reductions")
+            return {
+                170: {"number": 170, "state": "CLOSED", "title": "Superseded LCS model"},
+                173: {
+                    "number": 173,
+                    "state": "OPEN",
+                    "title": "Fix #109: Add LCS reduction",
+                },
+            }[pr_number]
+
+        candidates = review_candidates(
+            {
+                "items": [
+                    make_issue_item(
+                        "PVTI_10",
+                        108,
+                        status="Review pool",
+                        title="[Model] LongestCommonSubsequence",
+                        linked_prs=[170, 173],
+                    )
+                ]
+            },
+            "CodingThrust/problem-reductions",
+            fake_review_fetcher,
+            fake_pr_resolver,
+            fake_pr_info_fetcher,
+        )
+
+        self.assertEqual(len(candidates), 1)
+        self.assertEqual(
+            candidates[0],
+            {
+                "item_id": "PVTI_10",
+                "number": 173,
+                "issue_number": 108,
+                "pr_number": 173,
+                "status": STATUS_REVIEW_POOL,
+                "title": "[Model] LongestCommonSubsequence",
+                "eligibility": "ambiguous-linked-prs",
+                "reason": "multiple linked repo PRs require confirmation",
+                "recommendation": 173,
+                "linked_repo_prs": [
+                    {
+                        "number": 170,
+                        "state": "CLOSED",
+                        "title": "Superseded LCS model",
+                    },
+                    {
+                        "number": 173,
+                        "state": "OPEN",
+                        "title": "Fix #109: Add LCS reduction",
+                    },
+                ],
+            },
+        )
+
+    def test_review_candidates_report_waiting_for_copilot(self) -> None:
+        def fake_review_fetcher(repo: str, pr_number: int) -> list[dict]:
+            self.assertEqual(repo, "CodingThrust/problem-reductions")
+            self.assertEqual(pr_number, 570)
+            return []
+
+        def fake_pr_resolver(repo: str, issue_number: int) -> int | None:
+            self.assertEqual(repo, "CodingThrust/problem-reductions")
+            self.assertEqual(issue_number, 117)
+            return 570
+
+        def fake_pr_info_fetcher(repo: str, pr_number: int) -> dict:
+            self.assertEqual(repo, "CodingThrust/problem-reductions")
+            self.assertEqual(pr_number, 570)
+            return {
+                "number": 570,
+                "state": "OPEN",
+                "title": "Fix #117: [Model] GraphPartitioning",
+            }
+
+        candidates = review_candidates(
+            {
+                "items": [
+                    make_issue_item(
+                        "PVTI_11",
+                        117,
+                        status="Review pool",
+                        title="[Model] GraphPartitioning",
+                    )
+                ]
+            },
+            "CodingThrust/problem-reductions",
+            fake_review_fetcher,
+            fake_pr_resolver,
+            fake_pr_info_fetcher,
+        )
+
+        self.assertEqual(candidates[0]["eligibility"], "waiting-for-copilot")
+        self.assertEqual(candidates[0]["reason"], "open PR #570 waiting for Copilot review")
 
 
 if __name__ == "__main__":
