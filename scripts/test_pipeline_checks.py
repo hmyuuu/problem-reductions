@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
+import tempfile
 import unittest
+from pathlib import Path
 
 from pipeline_checks import (
+    completeness_check,
     detect_scope_from_paths,
     file_whitelist_check,
 )
@@ -85,6 +88,147 @@ class PipelineChecksTests(unittest.TestCase):
 
         self.assertTrue(report["ok"])
         self.assertEqual(report["violations"], [])
+
+    def test_model_completeness_reports_all_required_components(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            self._write(
+                repo / "src/models/graph/graph_partitioning.rs",
+                """
+                inventory::submit! { ProblemSchemaEntry { name: "GraphPartitioning" } }
+                impl OptimizationProblem for GraphPartitioning<SimpleGraph> {}
+                crate::declare_variants! { opt GraphPartitioning<SimpleGraph> => "1.2^n" }
+                pub(crate) fn canonical_model_example_specs() -> Vec<ModelExampleSpec> { vec![] }
+                """,
+            )
+            self._write(
+                repo / "src/unit_tests/models/graph/graph_partitioning.rs",
+                "#[test]\nfn test_graph_partitioning_basic() {}\n",
+            )
+            self._write(
+                repo / "src/unit_tests/trait_consistency.rs",
+                """
+                fn test_all_problems_implement_trait_correctly() {
+                    check_problem_trait(&GraphPartitioning::new(), "GraphPartitioning");
+                }
+                fn test_direction() {
+                    let _ = GraphPartitioning::new().direction();
+                }
+                """,
+            )
+            self._write(repo / "src/example_db/model_builders.rs", "pub fn build_model_examples() {}\n")
+            self._write(
+                repo / "docs/paper/reductions.typ",
+                """
+                #let display-name = (
+                  "GraphPartitioning": [Graph Partitioning],
+                )
+                #problem-def("GraphPartitioning")[body][proof]
+                """,
+            )
+
+            report = completeness_check("model", repo, name="GraphPartitioning")
+
+            self.assertTrue(report["ok"])
+            self.assertEqual(report["missing"], [])
+            self.assertEqual(report["checks"]["paper_display_name"]["status"], "pass")
+            self.assertEqual(report["checks"]["trait_direction"]["status"], "pass")
+
+    def test_model_completeness_flags_missing_paper_and_trait_entries(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            self._write(
+                repo / "src/models/graph/graph_partitioning.rs",
+                """
+                inventory::submit! { ProblemSchemaEntry { name: "GraphPartitioning" } }
+                impl OptimizationProblem for GraphPartitioning<SimpleGraph> {}
+                crate::declare_variants! { opt GraphPartitioning<SimpleGraph> => "1.2^n" }
+                pub(crate) fn canonical_model_example_specs() -> Vec<ModelExampleSpec> { vec![] }
+                """,
+            )
+            self._write(
+                repo / "src/unit_tests/models/graph/graph_partitioning.rs",
+                "#[test]\nfn test_graph_partitioning_basic() {}\n",
+            )
+            self._write(repo / "src/unit_tests/trait_consistency.rs", "fn test_direction() {}\n")
+            self._write(repo / "src/example_db/model_builders.rs", "pub fn build_model_examples() {}\n")
+            self._write(repo / "docs/paper/reductions.typ", "#let display-name = ()\n")
+
+            report = completeness_check("model", repo, name="GraphPartitioning")
+
+            self.assertFalse(report["ok"])
+            self.assertIn("paper_definition", report["missing"])
+            self.assertIn("paper_display_name", report["missing"])
+            self.assertIn("trait_consistency", report["missing"])
+
+    def test_rule_completeness_reports_all_required_components(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            self._write(
+                repo / "src/rules/binpacking_ilp.rs",
+                """
+                #[reduction(overhead = { num_vars = "num_items" })]
+                impl ReduceTo<ILP> for BinPacking {}
+                pub(crate) fn canonical_rule_example_specs() -> Vec<RuleExampleSpec> { vec![] }
+                """,
+            )
+            self._write(repo / "src/rules/mod.rs", "mod binpacking_ilp;\n")
+            self._write(
+                repo / "src/unit_tests/rules/binpacking_ilp.rs",
+                "#[test]\nfn test_binpacking_to_ilp_closed_loop() {}\n",
+            )
+            self._write(repo / "src/example_db/rule_builders.rs", "pub fn build_rule_examples() {}\n")
+            self._write(
+                repo / "docs/paper/reductions.typ",
+                '#reduction-rule("BinPacking", "ILP")[rule][proof]\n',
+            )
+
+            report = completeness_check(
+                "rule",
+                repo,
+                name="binpacking_ilp",
+                source="BinPacking",
+                target="ILP",
+            )
+
+            self.assertTrue(report["ok"])
+            self.assertEqual(report["checks"]["module_registration"]["status"], "pass")
+            self.assertEqual(report["checks"]["paper_rule"]["status"], "pass")
+
+    def test_rule_completeness_flags_missing_overhead_and_paper(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            self._write(
+                repo / "src/rules/binpacking_ilp.rs",
+                """
+                #[reduction]
+                impl ReduceTo<ILP> for BinPacking {}
+                """,
+            )
+            self._write(repo / "src/rules/mod.rs", "")
+            self._write(
+                repo / "src/unit_tests/rules/binpacking_ilp.rs",
+                "#[test]\nfn test_binpacking_to_ilp_closed_loop() {}\n",
+            )
+            self._write(repo / "src/example_db/rule_builders.rs", "pub fn build_rule_examples() {}\n")
+            self._write(repo / "docs/paper/reductions.typ", "")
+
+            report = completeness_check(
+                "rule",
+                repo,
+                name="binpacking_ilp",
+                source="BinPacking",
+                target="ILP",
+            )
+
+            self.assertFalse(report["ok"])
+            self.assertIn("overhead_form", report["missing"])
+            self.assertIn("paper_rule", report["missing"])
+            self.assertIn("module_registration", report["missing"])
+
+    def _write(self, path: Path, content: str) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content.strip() + "\n")
 
 
 if __name__ == "__main__":

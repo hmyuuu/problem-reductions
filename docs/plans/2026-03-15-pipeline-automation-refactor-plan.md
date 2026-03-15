@@ -335,7 +335,7 @@ Keep:
 
 - [x] Implement `detect-scope`
 - [x] Implement `file-whitelist`
-- [ ] Implement `completeness`
+- [x] Implement `completeness`
 - [x] Point `final-review` and `review-implementation` at the new checks
 
 ### Task 5: Thin the skills

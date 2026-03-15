@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -42,6 +43,18 @@ IGNORED_RULE_FILES = {
 
 def snake_to_camel(name: str) -> str:
     return "".join(part.capitalize() for part in name.split("_") if part)
+
+
+def camel_to_snake(name: str) -> str:
+    chars: list[str] = []
+    for index, char in enumerate(name):
+        if char.isupper() and index > 0 and (
+            not name[index - 1].isupper()
+            or (index + 1 < len(name) and name[index + 1].islower())
+        ):
+            chars.append("_")
+        chars.append(char.lower())
+    return "".join(chars)
 
 
 def is_new_model_file(path: str) -> bool:
@@ -141,6 +154,194 @@ def file_whitelist_check(kind: str, files: list[str]) -> dict:
     }
 
 
+def read_text(path: Path) -> str:
+    return path.read_text() if path.exists() else ""
+
+
+def find_model_file(repo_root: Path, file_stem: str) -> Path | None:
+    matches = sorted((repo_root / "src/models").glob(f"*/{file_stem}.rs"))
+    return matches[0] if matches else None
+
+
+def check_entry(
+    *,
+    status: str,
+    path: str | None = None,
+    detail: str | None = None,
+) -> dict:
+    return {
+        "status": status,
+        "path": path,
+        "detail": detail,
+    }
+
+
+def model_completeness(repo_root: Path, name: str) -> dict:
+    file_stem = camel_to_snake(name)
+    model_file = find_model_file(repo_root, file_stem)
+    test_file = None
+    if model_file is not None:
+        category = model_file.parent.name
+        test_file = repo_root / "src/unit_tests/models" / category / f"{file_stem}.rs"
+
+    model_text = read_text(model_file) if model_file is not None else ""
+    trait_text = read_text(repo_root / "src/unit_tests/trait_consistency.rs")
+    paper_text = read_text(repo_root / "docs/paper/reductions.typ")
+
+    is_optimization = f"impl OptimizationProblem for {name}" in model_text
+
+    checks = {
+        "model_file": (
+            check_entry(status="pass", path=str(model_file.relative_to(repo_root)))
+            if model_file is not None
+            else check_entry(status="fail", detail="missing model implementation file")
+        ),
+        "problem_schema": (
+            check_entry(status="pass", path=str(model_file.relative_to(repo_root)))
+            if model_file is not None and f'name: "{name}"' in model_text
+            else check_entry(status="fail", detail="missing ProblemSchemaEntry for model")
+        ),
+        "declare_variants": (
+            check_entry(status="pass", path=str(model_file.relative_to(repo_root)))
+            if model_file is not None
+            and "crate::declare_variants!" in model_text
+            and re.search(r"\b(?:default\s+)?(?:opt|sat)\b", model_text)
+            else check_entry(status="fail", detail="missing declare_variants! with opt/sat entries")
+        ),
+        "canonical_example": (
+            check_entry(status="pass", path=str(model_file.relative_to(repo_root)))
+            if model_file is not None and "canonical_model_example_specs" in model_text
+            else check_entry(status="fail", detail="missing canonical_model_example_specs")
+        ),
+        "unit_tests": (
+            check_entry(status="pass", path=str(test_file.relative_to(repo_root)))
+            if test_file is not None and test_file.exists()
+            else check_entry(status="fail", detail="missing model unit tests")
+        ),
+        "paper_definition": (
+            check_entry(status="pass", path="docs/paper/reductions.typ")
+            if f'#problem-def("{name}")' in paper_text
+            else check_entry(status="fail", detail="missing problem-def entry in paper")
+        ),
+        "paper_display_name": (
+            check_entry(status="pass", path="docs/paper/reductions.typ")
+            if f'"{name}":' in paper_text
+            else check_entry(status="fail", detail="missing display-name entry in paper")
+        ),
+        "trait_consistency": (
+            check_entry(status="pass", path="src/unit_tests/trait_consistency.rs")
+            if name in trait_text and "test_all_problems_implement_trait_correctly" in trait_text
+            else check_entry(status="fail", detail="missing trait consistency entry")
+        ),
+        "trait_direction": (
+            check_entry(status="pass", path="src/unit_tests/trait_consistency.rs")
+            if not is_optimization
+            else (
+                check_entry(status="pass", path="src/unit_tests/trait_consistency.rs")
+                if name in trait_text.split("fn test_direction()", 1)[-1]
+                else check_entry(status="fail", detail="missing optimization direction check")
+            )
+        ),
+    }
+
+    missing = [check_id for check_id, entry in checks.items() if entry["status"] == "fail"]
+    return {
+        "kind": "model",
+        "name": name,
+        "ok": not missing,
+        "checks": checks,
+        "missing": missing,
+    }
+
+
+def rule_completeness(
+    repo_root: Path,
+    name: str,
+    *,
+    source: str | None = None,
+    target: str | None = None,
+) -> dict:
+    rule_file = repo_root / "src/rules" / f"{name}.rs"
+    test_file = repo_root / "src/unit_tests/rules" / f"{name}.rs"
+    mod_file = repo_root / "src/rules/mod.rs"
+    paper_file = repo_root / "docs/paper/reductions.typ"
+
+    rule_text = read_text(rule_file)
+    mod_text = read_text(mod_file)
+    paper_text = read_text(paper_file)
+
+    paper_pattern = None
+    if source and target:
+        paper_pattern = f'#reduction-rule("{source}", "{target}"'
+
+    checks = {
+        "rule_file": (
+            check_entry(status="pass", path=str(rule_file.relative_to(repo_root)))
+            if rule_file.exists()
+            else check_entry(status="fail", detail="missing rule implementation file")
+        ),
+        "module_registration": (
+            check_entry(status="pass", path=str(mod_file.relative_to(repo_root)))
+            if rule_file.exists() and name in mod_text
+            else check_entry(status="fail", detail="missing src/rules/mod.rs registration")
+        ),
+        "unit_tests": (
+            check_entry(status="pass", path=str(test_file.relative_to(repo_root)))
+            if test_file.exists()
+            else check_entry(status="fail", detail="missing rule unit tests")
+        ),
+        "overhead_form": (
+            check_entry(status="pass", path=str(rule_file.relative_to(repo_root)))
+            if rule_file.exists() and "#[reduction(overhead = {" in rule_text
+            else check_entry(status="fail", detail="missing #[reduction(overhead = {...})] form")
+        ),
+        "canonical_example": (
+            check_entry(status="pass", path=str(rule_file.relative_to(repo_root)))
+            if rule_file.exists() and "canonical_rule_example_specs" in rule_text
+            else check_entry(status="fail", detail="missing canonical_rule_example_specs")
+        ),
+        "paper_rule": (
+            check_entry(status="pass", path=str(paper_file.relative_to(repo_root)))
+            if paper_pattern is not None and paper_pattern in paper_text
+            else check_entry(
+                status="fail",
+                detail=(
+                    "missing reduction-rule entry in paper"
+                    if paper_pattern is not None
+                    else "source/target required to check paper reduction-rule entry"
+                ),
+            )
+        ),
+    }
+
+    missing = [check_id for check_id, entry in checks.items() if entry["status"] == "fail"]
+    return {
+        "kind": "rule",
+        "name": name,
+        "source": source,
+        "target": target,
+        "ok": not missing,
+        "checks": checks,
+        "missing": missing,
+    }
+
+
+def completeness_check(
+    kind: str,
+    repo_root: str | Path,
+    *,
+    name: str,
+    source: str | None = None,
+    target: str | None = None,
+) -> dict:
+    repo_root = Path(repo_root)
+    if kind == "model":
+        return model_completeness(repo_root, name)
+    if kind == "rule":
+        return rule_completeness(repo_root, name, source=source, target=target)
+    raise ValueError(f"Unsupported completeness kind: {kind}")
+
+
 def git_output(*args: str) -> list[str]:
     output = subprocess.check_output(["git", *args], text=True)
     return [line for line in output.splitlines() if line]
@@ -169,6 +370,14 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     whitelist.add_argument("--files-file", required=True)
     whitelist.add_argument("--format", choices=["json", "text"], default="json")
 
+    completeness = subparsers.add_parser("completeness")
+    completeness.add_argument("--kind", choices=["model", "rule"], required=True)
+    completeness.add_argument("--name", required=True)
+    completeness.add_argument("--source")
+    completeness.add_argument("--target")
+    completeness.add_argument("--repo-root", default=".")
+    completeness.add_argument("--format", choices=["json", "text"], default="json")
+
     return parser.parse_args(argv)
 
 
@@ -195,6 +404,19 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "file-whitelist":
         emit_result(
             file_whitelist_check(args.kind, load_file_list(args.files_file)),
+            args.format,
+        )
+        return 0
+
+    if args.command == "completeness":
+        emit_result(
+            completeness_check(
+                args.kind,
+                args.repo_root,
+                name=args.name,
+                source=args.source,
+                target=args.target,
+            ),
             args.format,
         )
         return 0

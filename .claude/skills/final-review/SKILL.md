@@ -158,24 +158,37 @@ If all files are whitelisted, report "All files within expected whitelist" and c
 
 ### Step 4: Completeness check
 
+Run the deterministic completeness check first:
+
+```bash
+# Model example
+python3 scripts/pipeline_checks.py completeness --kind model --name GraphPartitioning --repo-root . --format json
+
+# Rule example
+python3 scripts/pipeline_checks.py completeness --kind rule --name binpacking_ilp --source BinPacking --target ILP --repo-root . --format json
+```
+
+Use the script result as the baseline checklist for files, paper entries, examples, variants/overhead forms, and trait-consistency coverage. Then apply maintainer judgment on anything the script cannot prove.
+
 Verify the PR includes all required components. Check:
 
 **For [Model] PRs:**
 - [ ] Model implementation (`src/models/...`)
 - [ ] Unit tests (`src/unit_tests/models/...`)
 - [ ] `declare_variants!` macro with explicit `opt`/`sat` solver-kind markers and intended default variant
-- [ ] CLI `pred create` support / help text as needed
-- [ ] Canonical model example in `src/example_db/model_builders.rs`
+- [ ] Schema / registry entry for CLI-facing model creation (`ProblemSchemaEntry`)
+- [ ] Canonical model example function in the model file
 - [ ] Paper section in `docs/paper/reductions.typ` (`problem-def` entry)
 - [ ] `display-name` entry in paper
-- [ ] `trait_consistency.rs` entry in `test_all_problems_implement_trait_correctly` (+ `test_direction` for optimization)
+- [ ] `trait_consistency.rs` entry in `src/unit_tests/trait_consistency.rs` (`test_all_problems_implement_trait_correctly`, plus `test_direction` for optimization)
 
 **For [Rule] PRs:**
 - [ ] Reduction implementation (`src/rules/...`)
+- [ ] `src/rules/mod.rs` registration
 - [ ] Unit tests (`src/unit_tests/rules/...`)
 - [ ] `#[reduction(overhead = {...})]` with correct expressions
-- [ ] Uses only the `overhead` form of `#[reduction]` and does not duplicate a primitive exact endpoint registration
-- [ ] Canonical rule example in `src/example_db/rule_builders.rs`
+- [ ] Uses only the `overhead` form of `#[reduction]`
+- [ ] Canonical rule example function in the rule file
 - [ ] Paper section in `docs/paper/reductions.typ` (`reduction-rule` entry)
 
 Report missing items:
