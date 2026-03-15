@@ -141,6 +141,7 @@ Check that the PR only touches files expected for its type. Any file outside the
 - `docs/src/reductions/problem_schemas.json` — schema export
 - `docs/src/reductions/reduction_graph.json` — graph export
 - `tests/suites/trait_consistency.rs` — trait consistency entry
+- `problemreductions-cli/tests/cli_tests.rs` — CLI integration tests for `pred create`
 
 **Whitelist for [Rule] PRs:**
 - `src/rules/<source>_<target>.rs` — reduction implementation
@@ -151,6 +152,7 @@ Check that the PR only touches files expected for its type. Any file outside the
 - `docs/paper/reductions.typ` — paper entry
 - `docs/src/reductions/reduction_graph.json` — graph export
 - `docs/src/reductions/problem_schemas.json` — only if updating field descriptions
+- `problemreductions-cli/tests/cli_tests.rs` — CLI integration tests if adding CLI support
 
 If any file falls outside these whitelists, flag it:
 
@@ -184,6 +186,13 @@ Verify the PR includes all required components. Check:
 - [ ] Uses only the `overhead` form of `#[reduction]` and does not duplicate a primitive exact endpoint registration
 - [ ] Canonical rule example in `src/example_db/rule_builders.rs`
 - [ ] Paper section in `docs/paper/reductions.typ` (`reduction-rule` entry)
+
+**Paper-example consistency check (both Model and Rule PRs):**
+
+The paper example must use data from the generated JSON (`docs/paper/examples/generated/`), not hand-written data. To verify:
+1. Run `make examples` on the PR branch to regenerate `docs/paper/examples/generated/models.json` and `rules.json`.
+2. For **[Rule] PRs**: the paper's `reduction-rule` entry must call `load-example(source, target)` (defined in `reductions.typ`) to load the canonical example from `rules.json`, and derive all concrete values from the loaded data using Typst array operations — no hand-written instance data.
+3. For **[Model] PRs**: read the problem's entry in `models.json` and compare its `instance` field against the paper's `problem-def` example. The paper example must use the same instance (allowing 0-indexed JSON vs 1-indexed math notation). If they differ, flag: "Paper example does not match `example_db` canonical instance in `models.json`."
 
 Report missing items:
 
