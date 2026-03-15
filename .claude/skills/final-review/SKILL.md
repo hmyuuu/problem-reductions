@@ -83,6 +83,32 @@ Collect all information needed for the review:
 
 1f. **Check for conflicts with main**: Run `gh pr view <number> --json mergeable`. If there are merge conflicts, launch a subagent to merge `origin/main` into the PR branch (in a worktree) and push the merge commit.
 
+1g. **PR / issue comment audit (REQUIRED)**: Final review must check the comment history before recommending merge.
+  - Set `REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)`
+  - Fetch and read:
+    - PR conversation comments: `gh api repos/$REPO/issues/<number>/comments`
+    - PR inline review comments: `gh api repos/$REPO/pulls/<number>/comments`
+    - PR review bodies: `gh api repos/$REPO/pulls/<number>/reviews`
+    - linked issue comments, if an issue exists
+  - Build a list of every actionable comment and classify each as:
+    - `addressed`
+    - `superseded / no longer applicable`
+    - `still open`
+  - Pay special attention to the `## Review Pipeline Report` comment. If it contains a `Remaining issues for final review` section, those items must be reviewed explicitly here.
+  - Do **not** recommend merge until every actionable comment has been dispositioned.
+
+1h. **Comment status summary**: Prepare a short summary for later steps:
+
+> **Comment Audit**
+>
+> [N addressed, M superseded, K still open]
+>
+> Open items:
+> - [comment / issue summary]
+> - ...
+
+If no actionable comments remain, report `No open actionable comments`.
+
 ### Step 2: Usefulness assessment
 
 Think critically about whether this model/rule is genuinely useful. Consider:
@@ -140,6 +166,7 @@ Check that the PR only touches files expected for its type. Any file outside the
 - `docs/src/reductions/problem_schemas.json` — schema export
 - `docs/src/reductions/reduction_graph.json` — graph export
 - `tests/suites/trait_consistency.rs` — trait consistency entry
+- `problemreductions-cli/tests/cli_tests.rs` — CLI integration tests for `pred create`
 
 **Whitelist for [Rule] PRs:**
 - `src/rules/<source>_<target>.rs` — reduction implementation
@@ -150,6 +177,7 @@ Check that the PR only touches files expected for its type. Any file outside the
 - `docs/paper/reductions.typ` — paper entry
 - `docs/src/reductions/reduction_graph.json` — graph export
 - `docs/src/reductions/problem_schemas.json` — only if updating field descriptions
+- `problemreductions-cli/tests/cli_tests.rs` — CLI integration tests if adding CLI support
 
 Run the deterministic whitelist check against the PR file list from `SNAPSHOT`:
 
@@ -211,6 +239,13 @@ Verify the PR includes all required components. Check:
 - [ ] Canonical rule example function in the rule file
 - [ ] Paper section in `docs/paper/reductions.typ` (`reduction-rule` entry)
 
+**Paper-example consistency check (both Model and Rule PRs):**
+
+The paper example must use data from the generated JSON (`docs/paper/examples/generated/`), not hand-written data. To verify:
+1. Run `make examples` on the PR branch to regenerate `docs/paper/examples/generated/models.json` and `rules.json`.
+2. For **[Rule] PRs**: the paper's `reduction-rule` entry must call `load-example(source, target)` (defined in `reductions.typ`) to load the canonical example from `rules.json`, and derive all concrete values from the loaded data using Typst array operations — no hand-written instance data.
+3. For **[Model] PRs**: read the problem's entry in `models.json` and compare its `instance` field against the paper's `problem-def` example. The paper example must use the same instance (allowing 0-indexed JSON vs 1-indexed math notation). If they differ, flag: "Paper example does not match `example_db` canonical instance in `models.json`."
+
 Report missing items:
 
 > **Completeness Check**
@@ -264,6 +299,7 @@ Present a summary table:
 
 | Aspect | Result |
 |--------|--------|
+| Comments | [All addressed / Open: X, Y] |
 | Usefulness | [Useful/Marginal/Not useful] |
 | Safety | [Safe/Concerns found] |
 | Completeness | [Complete/Missing: X, Y] |
@@ -280,6 +316,8 @@ Then present all numbered issues from Step 5 as a multi-select `AskUserQuestion`
 > - "OnHold" — move to OnHold column with a reason
 
 This lets the reviewer cherry-pick exactly which issues to fix. If the reviewer selects fixes, proceed to Step 7 Quick fix. If "Merge as-is", proceed to Step 7 Merge.
+
+If any actionable PR / issue comment from Step 1g is still open, `Merge as-is` must **not** be your recommendation. Recommend either **Quick fix** or **OnHold** instead.
 
 ### Step 7: Execute decision
 
