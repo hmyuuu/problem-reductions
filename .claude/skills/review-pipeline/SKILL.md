@@ -34,118 +34,57 @@ GitHub Project board IDs (for `gh project item-edit`):
 
 ## Autonomous Mode
 
-This skill runs **fully autonomously** except for one case: if a Review pool card links multiple PRs in `CodingThrust/problem-reductions` and the user did not specify which PR to process, STOP and ask the user which PR is the intended target.
+This skill runs **fully autonomously** except for one case: if the scripted `review-pipeline` context bundle returns `status == "needs-user-choice"`, STOP and ask the user which PR is the intended target.
 
 ## Steps
 
-### 0. Discover Review pool Items
+### 0. Load the Review-Pipeline Context Bundle
 
-Collect the scripted candidate list first:
+Start from the skill-scoped bundle instead of composing board selection, worktree prep, and PR context manually:
 
 ```bash
 REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-CANDIDATES=$(python3 scripts/pipeline_board.py list review --repo "$REPO" --format json)
-```
-
-Inspect `CANDIDATES["items"]`. Each item includes:
-- `item_id`, `title`, `issue_number`, `pr_number`, `eligibility`, `reason`
-- for ambiguous cards: `linked_repo_prs` and `recommendation`
-
-The scripted `eligibility` values are:
-- `eligible`
-- `waiting-for-copilot`
-- `stale-closed-pr`
-- `ambiguous-linked-prs`
-- `no-open-pr`
-
-#### 0b. Print the List
-
-Print the candidate list using the scripted eligibility:
-
-```
-Review pool PRs:
-  #570  Fix #117: [Model] GraphPartitioning     [eligible]
-  #571  Fix #97: [Rule] BinPacking to ILP       [waiting-for-copilot]
-  #170  Fix #108: [Model] LongestCommonSubsequence [stale-closed-pr]
-  issue #108 [Model] LongestCommonSubsequence   [ambiguous-linked-prs]
-```
-
-**If a specific PR number was provided:** find the matching entry in `CANDIDATES["items"]` by `pr_number`. If its `eligibility` is:
-- `eligible`: continue
-- `waiting-for-copilot`: STOP with `PR #N is waiting for Copilot review. Re-run after Copilot has reviewed.`
-- `stale-closed-pr`: STOP with `PR #N is closed and not eligible for review-pipeline.`
-- `ambiguous-linked-prs`: this specific PR number counts as the user's disambiguation choice. Use that PR number, but keep the card marked as ambiguous until stale links are cleaned up.
-- missing from the list: STOP with `PR #N is not currently in the Review pool candidate set.`
-
-If the matched entry has `eligibility == "ambiguous-linked-prs"`, keep `PR` set to the chosen PR number, extract `ITEM_ID`, `TITLE`, and `ISSUE` from the matching candidate entry, and use the manual claim fallback in Step 0g because the scripted queue intentionally skips ambiguous cards.
-
-Otherwise, claim the item into `Under review` through the scripted bundle:
-
-```bash
 STATE_FILE=/tmp/problemreductions-review-selection.json
-CLAIM=$(python3 scripts/pipeline_board.py claim-next review "$STATE_FILE" --repo "$REPO" --number "$PR" --format json)
+set -- python3 scripts/pipeline_skill_context.py review-pipeline --repo "$REPO" --state-file "$STATE_FILE" --format json
+if [ -n "${PR:-}" ]; then
+  set -- "$@" --pr "$PR"
+fi
+CTX=$("$@")
+STATUS=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])")
 ```
 
-If the command exits with status 1, STOP with: `PR #N is not currently in the Review pool candidate set.`
+Branch on `STATUS`:
 
-Extract `ITEM_ID`, `TITLE`, and `ISSUE` from `CLAIM`, and keep `PR` set to the chosen PR number.
+- `empty`: STOP with `No Review pool PRs are currently eligible for review-pipeline.`
+- `needs-user-choice`: STOP and ask the user which PR is intended. Show `CTX["options"]` and recommend `CTX["recommendation"]` when present.
+- `ready`: continue with the already-claimed board item, prepared worktree, and bundled PR context.
 
-**If `--all`:** process only entries where `eligibility == "eligible"` in order (lowest PR number first). Skip waiting, stale, no-open-pr, and ambiguous items.
-
-**Otherwise:** claim the next eligible item through the scripted queue:
-
-```bash
-STATE_FILE=/tmp/problemreductions-review-selection.json
-CLAIM=$(python3 scripts/pipeline_board.py claim-next review "$STATE_FILE" --repo "$REPO" --format json)
-```
-
-If the command exits with status 1, STOP with: `No Review pool PRs are currently eligible for review-pipeline.`
-
-Extract the board item and PR metadata from `CLAIM`:
-
-```bash
-ITEM_ID=$(printf '%s\n' "$CLAIM" | python3 -c "import sys,json; print(json.load(sys.stdin)['item_id'])")
-PR=$(printf '%s\n' "$CLAIM" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['pr_number'] or data['number'])")
-TITLE=$(printf '%s\n' "$CLAIM" | python3 -c "import sys,json; print(json.load(sys.stdin)['title'])")
-ISSUE=$(printf '%s\n' "$CLAIM" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['issue_number'] or '')")
-```
-
-**If `CANDIDATES["items"]` contains an ambiguous card that you need to resolve manually:** STOP and ask the user which PR to process. Show short options from `linked_repo_prs` and recommend `recommendation` when present:
+For `needs-user-choice`, format the prompt like:
 
 ```text
-Review pool card [Model] LongestCommonSubsequence links multiple repo PRs:
-1. PR #170 — CLOSED — Superseded: Add LongestCommonSubsequence model
-2. PR #173 — OPEN — Fix #109: Add LCS to MaximumIndependentSet reduction  (Recommended)
-
-Recommendation rule:
-- Prefer the only OPEN repo PR when all others are closed or merged.
-- If multiple repo PRs are OPEN, prefer the one whose title/body most directly matches the card's current work, and say that the card still needs stale-link cleanup.
+Review pool card links multiple repo PRs:
+1. PR #170 — CLOSED — Superseded LCS model
+2. PR #173 — OPEN — Fix #109: Add LCS reduction  (Recommended)
 ```
 
-### 0g. Claim Result
-
-If you used `claim-next review`, the scripted bundle has already moved the chosen item to `Under review`, which prevents another agent from picking the same PR.
-
-If you reached this point through the ambiguous-card path above, manually claim it now:
+When `STATUS == ready`, extract the working objects:
 
 ```bash
-python3 scripts/pipeline_board.py move <ITEM_ID> under-review
-```
-
-In `--all` mode, claim each PR right before processing it (not all at once).
-
-### 1. Prepare Review Worktree
-
-Create an isolated git worktree and attempt the `origin/main` merge in one scripted step so the main working directory stays clean:
-
-```bash
-REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-PREP=$(python3 scripts/pipeline_worktree.py prepare-review --repo "$REPO" --pr "$PR" --format json)
-WORKTREE_DIR=$(printf '%s\n' "$PREP" | python3 -c "import sys,json; print(json.load(sys.stdin)['checkout']['worktree_dir'])")
+ITEM_ID=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.load(sys.stdin)['selection']['item_id'])")
+TITLE=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.load(sys.stdin)['selection']['title'])")
+ISSUE=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['selection'].get('issue_number') or '')")
+PR=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.load(sys.stdin)['selection']['pr_number'])")
+PREP=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['prep']))")
+PR_CTX=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.dumps(json.load(sys.stdin)['pr']))")
+WORKTREE_DIR=$(printf '%s\n' "$CTX" | python3 -c "import sys,json; print(json.load(sys.stdin)['prep']['checkout']['worktree_dir'])")
 cd "$WORKTREE_DIR"
 ```
 
-All subsequent steps run inside the worktree.
+The bundle already handled the mechanical claim step:
+- normal eligible PRs are claimed through the review queue
+- explicit `--pr` matches on ambiguous cards are treated as deterministic disambiguation and claimed automatically
+
+All subsequent steps run inside the prepared worktree and should read facts from `PREP` and `PR_CTX` instead of re-fetching them by default.
 
 ### 1a. Resolve Conflicts with Main
 
@@ -155,7 +94,7 @@ All subsequent steps run inside the worktree.
 2. If they changed, read the current versions on main (`git show origin/main:.claude/skills/add-model/SKILL.md` and `git show origin/main:.claude/skills/add-rule/SKILL.md`) to understand what's different.
 3. When resolving conflicts in model/rule implementation files, prefer the patterns from main's current skills — the PR's implementation may be based on outdated skill instructions.
 
-Read the bundled merge result:
+Read the bundled merge result from `PREP`:
 
 ```bash
 MERGE_STATUS=$(printf '%s\n' "$PREP" | python3 -c "import sys,json; print(json.load(sys.stdin)['merge']['status'])")
@@ -179,13 +118,15 @@ LIKELY_COMPLEX=$(printf '%s\n' "$PREP" | python3 -c "import sys,json; print(str(
 
 ### 2. Fix Copilot Review Comments
 
-Copilot review is guaranteed to exist (verified in Step 0). Fetch the comments:
+`PR_CTX` already includes the full structured PR context:
+- `PR_CTX["comments"]`
+- `PR_CTX["linked_issue_number"]`
+- `PR_CTX["human_linked_issue_comments"]`
+- `PR_CTX["ci"]`
+- `PR_CTX["codecov"]`
+- `PR_CTX["issue_context_text"]`
 
-```bash
-COMMENTS=$(python3 scripts/pipeline_pr.py comments --repo "$REPO" --pr "$PR" --format json)
-```
-
-Inspect the `copilot_inline_comments` array in `COMMENTS`. If there are actionable comments: invoke `/fix-pr` to address them, then push:
+Inspect `PR_CTX["comments"]["copilot_inline_comments"]`. If there are actionable comments: invoke `/fix-pr` to address them, then push:
 
 ```bash
 git push
@@ -195,12 +136,15 @@ If Copilot approved with no actionable comments: skip to next step.
 
 ### 2a. Check Issue Comments and Human PR Reviews
 
-Reuse the `COMMENTS` JSON from Step 2. It already includes:
-- `linked_issue_number`
-- `human_linked_issue_comments`
+Reuse the structured comment data inside `PR_CTX["comments"]`. It already includes:
 - `human_inline_comments`
 - `human_issue_comments`
 - `human_reviews`
+
+Reuse the linked-issue fields in `PR_CTX`:
+- `linked_issue_number`
+- `human_linked_issue_comments`
+- `issue_context_text`
 
 For each actionable comment found:
 

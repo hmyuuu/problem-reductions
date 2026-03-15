@@ -150,6 +150,19 @@ pr_wait_ci() {
     python3 scripts/pipeline_pr.py wait-ci --repo "$repo" --pr "$pr" --timeout "$timeout" --interval "$interval" --format json
 }
 
+review_pipeline_context() {
+    repo=$1
+    pr=${2-}
+    state_file=${3:-/tmp/problemreductions-review-state.json}
+    fmt=${4:-json}
+
+    set -- scripts/pipeline_skill_context.py review-pipeline --repo "$repo" --state-file "$state_file" --format "$fmt"
+    if [ -n "$pr" ]; then
+        set -- "$@" --pr "$pr"
+    fi
+    python3 "$@"
+}
+
 # --- Issue helpers ---
 
 issue_guards() {
