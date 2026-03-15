@@ -43,7 +43,7 @@ Normalize to:
 ### 2. Fetch Issue + Preflight Guards
 
 ```bash
-ISSUE_JSON=$(python3 scripts/pipeline_checks.py issue-guards \
+ISSUE_JSON=$(python3 scripts/pipeline_checks.py issue-context \
   --repo "$REPO" \
   --issue "$ISSUE" \
   --format json)

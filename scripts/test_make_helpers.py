@@ -450,6 +450,60 @@ class MakeHelpersTests(unittest.TestCase):
             ],
         )
 
+    def test_issue_context_uses_pipeline_checks_cli(self) -> None:
+        if shutil.which("dash") is None:
+            self.skipTest("dash is not installed")
+
+        proc = subprocess.run(
+            [
+                "dash",
+                "-c",
+                (
+                    ". scripts/make_helpers.sh; "
+                    "python3() { printf '%s\\n' \"$@\"; }; "
+                    "issue_context CodingThrust/problem-reductions 117 /tmp/repo"
+                ),
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertEqual(
+            proc.stdout.splitlines(),
+            [
+                "scripts/pipeline_checks.py",
+                "issue-context",
+                "--repo",
+                "CodingThrust/problem-reductions",
+                "--issue",
+                "117",
+                "--repo-root",
+                "/tmp/repo",
+                "--format",
+                "json",
+            ],
+        )
+
+    def test_make_issue_context_uses_shared_helper(self) -> None:
+        proc = subprocess.run(
+            [
+                "make",
+                "-n",
+                "issue-context",
+                "ISSUE=117",
+                "REPO=CodingThrust/problem-reductions",
+            ],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+        )
+        self.assertEqual(proc.returncode, 0, proc.stderr)
+        self.assertIn(
+            'issue_context "$repo" "117"',
+            proc.stdout,
+        )
+
     def test_create_issue_worktree_uses_pipeline_worktree_cli(self) -> None:
         if shutil.which("dash") is None:
             self.skipTest("dash is not installed")

@@ -558,6 +558,19 @@ def issue_guard_check(
     }
 
 
+def issue_context_check(
+    repo_root: str | Path,
+    *,
+    issue: dict,
+    existing_prs: list[dict],
+) -> dict:
+    return issue_guard_check(
+        repo_root,
+        issue=issue,
+        existing_prs=existing_prs,
+    )
+
+
 def run_gh_json(*args: str):
     return json.loads(subprocess.check_output(["gh", *args], text=True))
 
@@ -648,6 +661,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     issue_guards.add_argument("--repo-root", default=".")
     issue_guards.add_argument("--format", choices=["json", "text"], default="json")
 
+    issue_context = subparsers.add_parser("issue-context")
+    issue_context.add_argument("--repo", required=True)
+    issue_context.add_argument("--issue", required=True, type=int)
+    issue_context.add_argument("--repo-root", default=".")
+    issue_context.add_argument("--format", choices=["json", "text"], default="json")
+
     return parser.parse_args(argv)
 
 
@@ -721,9 +740,9 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 0
 
-    if args.command == "issue-guards":
+    if args.command in {"issue-guards", "issue-context"}:
         emit_result(
-            issue_guard_check(
+            issue_context_check(
                 args.repo_root,
                 issue=fetch_issue(args.repo, args.issue),
                 existing_prs=fetch_existing_prs(args.repo, args.issue),

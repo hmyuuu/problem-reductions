@@ -159,6 +159,13 @@ issue_guards() {
     python3 scripts/pipeline_checks.py issue-guards --repo "$repo" --issue "$issue" --repo-root "$repo_root" --format json
 }
 
+issue_context() {
+    repo=$1
+    issue=$2
+    repo_root=${3:-.}
+    python3 scripts/pipeline_checks.py issue-context --repo "$repo" --issue "$issue" --repo-root "$repo_root" --format json
+}
+
 # --- Worktree helpers ---
 
 create_issue_worktree() {

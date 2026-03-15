@@ -241,11 +241,11 @@ git commit -m "refactor(pipeline): bundle queue claiming"
 - Modify: `Makefile`
 - Modify: `scripts/make_helpers.sh`
 
-- [ ] **Step 1: Add failing tests for the alias / richer output contract**
-- [ ] **Step 2: Run `python3 scripts/test_pipeline_checks.py` and verify failure**
-- [ ] **Step 3: Implement `issue-context` as an alias or replacement for `issue-guards`**
-- [ ] **Step 4: Rewrite `issue-to-pr` to use the final command name**
-- [ ] **Step 5: Re-run `python3 scripts/test_pipeline_checks.py` and `python3 scripts/test_make_helpers.py`**
+- [x] **Step 1: Add failing tests for the alias / richer output contract**
+- [x] **Step 2: Run `python3 scripts/test_pipeline_checks.py` and verify failure**
+- [x] **Step 3: Implement `issue-context` as an alias or replacement for `issue-guards`**
+- [x] **Step 4: Rewrite `issue-to-pr` to use the final command name**
+- [x] **Step 5: Re-run `python3 scripts/test_pipeline_checks.py` and `python3 scripts/test_make_helpers.py`**
 - [ ] **Step 6: Commit**
 
 ```bash

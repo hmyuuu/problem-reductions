@@ -3,6 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import pipeline_checks
 from pipeline_checks import (
     build_review_context,
     completeness_check,
@@ -374,6 +375,31 @@ class PipelineChecksTests(unittest.TestCase):
             self.assertEqual(report["resume_pr"]["number"], 650)
             self.assertEqual(report["resume_pr"]["head_ref_name"], "issue-120-graph-partitioning")
 
+    def test_issue_context_alias_matches_issue_guard_contract(self) -> None:
+        issue_context_check = getattr(pipeline_checks, "issue_context_check", None)
+        self.assertIsNotNone(issue_context_check)
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo = Path(tmpdir)
+            report = issue_context_check(
+                repo,
+                issue={
+                    "number": 121,
+                    "title": "[Model] ExactCoverBy3Sets",
+                    "body": "Implement the model.",
+                    "state": "OPEN",
+                    "url": "https://example.test/issues/121",
+                    "labels": [{"name": "Good"}],
+                    "comments": [],
+                },
+                existing_prs=[],
+            )
+
+            self.assertTrue(report["ok"])
+            self.assertEqual(report["issue_number"], 121)
+            self.assertEqual(report["kind"], "model")
+            self.assertEqual(report["action"], "create-pr")
+
     def test_build_review_context_reports_model_bundle(self) -> None:
         with tempfile.TemporaryDirectory() as tmpdir:
             repo = Path(tmpdir)
@@ -468,6 +494,23 @@ class PipelineChecksTests(unittest.TestCase):
         self.assertEqual(args.command, "review-context")
         self.assertEqual(args.base, "abc123")
         self.assertEqual(args.head, "def456")
+
+    def test_parse_args_accepts_issue_context(self) -> None:
+        args = parse_args(
+            [
+                "issue-context",
+                "--repo",
+                "CodingThrust/problem-reductions",
+                "--issue",
+                "117",
+                "--format",
+                "json",
+            ]
+        )
+
+        self.assertEqual(args.command, "issue-context")
+        self.assertEqual(args.repo, "CodingThrust/problem-reductions")
+        self.assertEqual(args.issue, 117)
 
     def _write(self, path: Path, content: str) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

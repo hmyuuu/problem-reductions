@@ -1,6 +1,6 @@
 # Makefile for problemreductions
 
-.PHONY: help build test mcp-test fmt clippy doc mdbook paper examples clean coverage rust-export compare qubo-testdata export-schemas release run-plan run-issue run-pipeline run-pipeline-forever run-review run-review-forever board-next board-claim board-ack board-move issue-guards pr-context pr-wait-ci worktree-issue worktree-pr diagrams jl-testdata cli cli-demo copilot-review
+.PHONY: help build test mcp-test fmt clippy doc mdbook paper examples clean coverage rust-export compare qubo-testdata export-schemas release run-plan run-issue run-pipeline run-pipeline-forever run-review run-review-forever board-next board-claim board-ack board-move issue-context issue-guards pr-context pr-wait-ci worktree-issue worktree-pr diagrams jl-testdata cli cli-demo copilot-review
 
 RUNNER ?= codex
 CLAUDE_MODEL ?= opus
@@ -41,7 +41,8 @@ help:
 	@echo "  board-claim MODE=<ready|review> [NUMBER=<n>] [FORMAT=text|json] - Claim and move the next eligible queued project item"
 	@echo "  board-ack MODE=<ready|review|final-review> ITEM=<id> - Acknowledge a queued project item"
 	@echo "  board-move ITEM=<id> STATUS=<status> - Move a project item to a named status"
-	@echo "  issue-guards ISSUE=<number> [REPO=<owner/repo>] - Fetch structured issue preflight JSON"
+	@echo "  issue-context ISSUE=<number> [REPO=<owner/repo>] - Fetch structured issue preflight JSON"
+	@echo "  issue-guards ISSUE=<number> [REPO=<owner/repo>] - Backward-compatible alias for issue-context"
 	@echo "  pr-context PR=<number> [REPO=<owner/repo>] - Fetch structured PR snapshot JSON"
 	@echo "  pr-wait-ci PR=<number> [REPO=<owner/repo>] - Poll CI until terminal state and print JSON"
 	@echo "  worktree-issue ISSUE=<number> SLUG=<slug> - Create an issue worktree from origin/main"
@@ -477,6 +478,18 @@ board-move:
 	fi
 	@. scripts/make_helpers.sh; \
 	move_board_item "$(ITEM)" "$(STATUS)"
+
+# Fetch deterministic issue preflight JSON for issue-to-pr
+# Usage: make issue-context ISSUE=117
+#        make issue-context ISSUE=117 REPO=CodingThrust/problem-reductions
+issue-context:
+	@if [ -z "$(ISSUE)" ]; then \
+		echo "ISSUE=<number> is required"; \
+		exit 2; \
+	fi
+	@. scripts/make_helpers.sh; \
+	repo=$${REPO:-CodingThrust/problem-reductions}; \
+	issue_context "$$repo" "$(ISSUE)"
 
 # Fetch deterministic issue preflight JSON for issue-to-pr
 # Usage: make issue-guards ISSUE=117
