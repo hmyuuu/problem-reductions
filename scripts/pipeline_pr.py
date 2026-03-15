@@ -320,6 +320,7 @@ def build_snapshot(
         for commit in pr_data.get("commits", [])
     ]
 
+    author_data = pr_data.get("author") or {}
     return {
         "number": pr_data.get("number"),
         "title": pr_data.get("title"),
@@ -327,6 +328,7 @@ def build_snapshot(
         "state": pr_data.get("state"),
         "url": pr_data.get("url"),
         "mergeable": pr_data.get("mergeable"),
+        "author": author_data.get("login", ""),
         "head_ref_name": pr_data.get("headRefName"),
         "base_ref_name": pr_data.get("baseRefName"),
         "head_sha": pr_data.get("headRefOid"),
@@ -488,7 +490,7 @@ def fetch_pr_data(repo: str, pr_number: int) -> dict:
         "--json",
         (
             "number,title,body,labels,files,additions,deletions,commits,"
-            "headRefName,baseRefName,headRefOid,url,state,mergeable"
+            "headRefName,baseRefName,headRefOid,url,state,mergeable,author"
         ),
     )
 

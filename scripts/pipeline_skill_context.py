@@ -417,6 +417,14 @@ def render_final_review_text(result: dict) -> str:
     if diff_stat:
         lines.extend(["", "## Diff Stat", "```text", diff_stat, "```"])
 
+    full_diff = review_context.get("full_diff")
+    if full_diff:
+        lines.extend(["", "## Full Diff", "```diff", full_diff, "```"])
+
+    pred_list = review_context.get("pred_list")
+    if pred_list:
+        lines.extend(["", "## Problem Catalog (`pred list`)", "```text", pred_list, "```"])
+
     return "\n".join(lines) + "\n"
 
 
@@ -674,6 +682,19 @@ def select_final_review_entry(
     )
 
 
+def _get_current_gh_user() -> str:
+    """Return the GitHub login of the currently authenticated user."""
+    try:
+        output = subprocess.check_output(
+            ["gh", "api", "user", "--jq", ".login"],
+            text=True,
+            stderr=subprocess.DEVNULL,
+        )
+        return output.strip()
+    except Exception:
+        return ""
+
+
 def git_output_in(repo_root: str | Path, *args: str) -> list[str]:
     output = subprocess.check_output(
         ["git", "-C", str(repo_root), *args],
@@ -733,12 +754,37 @@ def build_final_review_checks(*, prep: dict, pr_context: dict) -> dict:
         changed_files=changed_files,
     )
     subject = infer_final_review_subject(scope, pr_context)
-    return pipeline_checks.build_review_context(
+    review_context = pipeline_checks.build_review_context(
         worktree_dir,
         diff_stat=git_text_in(worktree_dir, "diff", "--stat", diff_range),
         scope=scope,
         subject=subject,
     )
+    review_context["full_diff"] = git_text_in(worktree_dir, "diff", diff_range)
+    review_context["pred_list"] = _run_pred_list(worktree_dir)
+    return review_context
+
+
+def _run_pred_list(worktree_dir: str | Path) -> str | None:
+    """Run ``pred list`` in *worktree_dir*, building the CLI first if needed."""
+    pred_cmd = ["cargo", "run", "-p", "problemreductions-cli", "--bin", "pred", "--", "list"]
+    try:
+        return subprocess.check_output(
+            pred_cmd, cwd=str(worktree_dir), text=True, stderr=subprocess.DEVNULL,
+        )
+    except (subprocess.CalledProcessError, FileNotFoundError):
+        pass
+    # Binary may not exist yet — build it and retry.
+    try:
+        subprocess.check_call(
+            ["make", "cli"], cwd=str(worktree_dir),
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        return subprocess.check_output(
+            pred_cmd, cwd=str(worktree_dir), text=True, stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return None
 
 
 def default_review_implementation_context_builder(
@@ -1161,6 +1207,14 @@ def build_final_review_context(
     selected_pr_number = int(selection.get("pr_number") or selection["number"])
     pr_context = pr_context_builder(repo, selected_pr_number)
 
+    # Self-review warning: flag if reviewer is the PR author (unless repo owner).
+    pr_author = (pr_context.get("author") or "").lower()
+    current_user = _get_current_gh_user().lower()
+    repo_owner = repo.split("/", 1)[0].lower() if "/" in repo else ""
+    self_review_warning = None
+    if pr_author and current_user and pr_author == current_user and current_user != repo_owner:
+        self_review_warning = f"Self-review: PR author '{pr_author}' is the current reviewer"
+
     prep: dict
     try:
         prep = review_preparer(repo, selected_pr_number)
@@ -1198,6 +1252,7 @@ def build_final_review_context(
             ],
         }
 
+    warnings = [self_review_warning] if self_review_warning else []
     return build_status_result(
         "final-review",
         status="ready",
@@ -1205,6 +1260,7 @@ def build_final_review_context(
         pr=pr_context,
         prep=prep,
         review_context=review_context,
+        warnings=warnings or None,
     )
 
 

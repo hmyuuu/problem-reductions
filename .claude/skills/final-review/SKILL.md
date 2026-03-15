@@ -43,48 +43,43 @@ REPORT=$("$@")
 printf '%s\n' "$REPORT"
 ```
 
-The report is the Step 0 packet. It should already include:
+The report is the Step 0 packet. It already includes **all** mechanical context:
 - Selection: board item, PR number, linked issue, title, URL
 - Recommendation Seed: suggested mode and deterministic blockers
 - Subject
-- Comment Summary
+- Comment Summary (with linked issue context)
 - Merge Prep
 - Deterministic Checks
 - Changed Files
 - Diff Stat
+- Full Diff
 
 Branch from the report:
 - `Bundle status: empty` => stop with `No items in the Final review column`
-- `Bundle status: ready` => continue normally
+- `Bundle status: ready` => continue normally (check warnings — a self-review warning means the reviewer is the PR author; flag it but do not block)
 - `Bundle status: ready-with-warnings` => continue only with the narrow warning fallback described in the report
 
 When you need to take actions later, use the identifiers already printed in the report (`Board item`, `PR`, URL). If you absolutely need raw structured data for a corner case, rerun the same command with `--format json`, but do not rebuild Step 0 manually.
 
-### Step 1: Use the Bundled Review Context
+### Step 1: Push the Merge with Main
 
-Use the text report as the primary mechanical context. Read these sections directly:
-- `Selection`
-- `Recommendation Seed`
-- `Subject`
-- `Comment Summary`
-- `Merge Prep`
-- `Deterministic Checks`
-- `Changed Files`
-- `Diff Stat`
+The context script already merged `origin/main` into the PR branch in the worktree. Read the report's `Merge Prep` section:
 
-Read the full diff as additional review input:
+- **Merge status: clean** — push the merge commit from the worktree:
+  ```bash
+  cd <worktree path from report>
+  git push
+  ```
+- **Merge status: conflicted** — note the conflicts. You can still continue with the review steps below and decide whether to resolve or hold in Step 6.
+- **Merge prep failed** — skip this step; the warning fallback applies.
 
-```bash
-gh pr diff <PR from report>
-```
+### Step 1a: Use the Bundled Review Context
 
-Run `pred list` (CLI tool, not MCP) to see the surrounding problem/reduction graph context before assessing usefulness.
-
-If the report says the merge prep is conflicted but reviewable, you can still continue with the deterministic checks and decide whether to resolve or hold.
+**Trust the report.** The Step 0 report already contains all mechanical context — selection, comments, linked issue, merge prep, deterministic checks, changed files, diff stat, full diff, and `pred list` output. Do NOT re-fetch any of this data with separate tool calls (e.g., `gh api` for comments, `gh pr diff`, `gh pr view`, `pred list`). Extract everything directly from the report text.
 
 If the report is in the warning fallback path, keep the fallback narrow. Prefer hold/manual follow-up over reconstructing the whole pipeline inside the skill.
 
-### Step 1a: Comment Audit (REQUIRED)
+### Step 1b: Comment Audit (REQUIRED)
 
 Final review must check the comment history before recommending merge.
 
@@ -206,6 +201,22 @@ The paper example must use data from the generated JSON (`docs/paper/examples/ge
 2. For **[Rule] PRs**: the paper's `reduction-rule` entry must call `load-example(source, target)` (defined in `reductions.typ`) to load the canonical example from `rules.json`, and derive all concrete values from the loaded data using Typst array operations — no hand-written instance data.
 3. For **[Model] PRs**: read the problem's entry in `models.json` and compare its `instance` field against the paper's `problem-def` example. The paper example must use the same instance (allowing 0-indexed JSON vs 1-indexed math notation). If they differ, flag: "Paper example does not match `example_db` canonical instance in `models.json`."
 
+**Issue–test round-trip consistency check (both Model and Rule PRs):**
+
+The unit test's example instance and expected solution must match the issue's example. Compare using the report's `Linked Issue Context` and `Full Diff`:
+
+1. **Instance match**: The unit test's `example_instance()` (or equivalent setup) must construct the same graph/weights/parameters as described in the issue's "Example Instance" section. Check vertex count, edge list, weights, and any problem-specific fields (e.g., terminals, clauses).
+2. **Solution match**: The expected optimal value in the test (e.g., `SolutionSize::Valid(6)`) must equal the issue's stated optimal. For rules, the closed-loop test must verify that reducing and solving the target gives the same optimum as solving the source directly.
+3. **Brute-force verification**: A brute-force test must exist that independently confirms the expected optimum, not just assert a hardcoded value.
+
+If any mismatch is found, flag it:
+
+> **Issue–Test Consistency**
+>
+> Mismatch: [describe what differs — e.g., "Issue says optimal cost = 6 but test asserts 7"]
+
+If all match, report "Issue example and unit tests are consistent."
+
 Report missing items:
 
 > **Completeness Check**
@@ -268,23 +279,40 @@ Present a summary table:
 
 Then present all numbered issues from Step 5 as a multi-select `AskUserQuestion`:
 
-> **Which issues should be fixed before merging?** (select all that apply, or "Merge as-is")
-> - "Merge as-is" — no fixes needed
-> - "Fix 1: [short description]" — [one-line summary]
-> - "Fix 2: [short description]" — [one-line summary]
+> **How should we proceed?** (select all that apply)
+> - "Approve & Merge" — approve the PR, then squash-merge and move to Done
+> - "Record 1: [short description]" — record for follow-up fix (does not block merge)
+> - "Record 2: [short description]" — record for follow-up fix
+> - ...
+> - "Quick fix 1: [short description]" — fix now before merging
+> - "Quick fix 2: [short description]" — fix now before merging
 > - ...
 > - "OnHold" — move to OnHold column with a reason
 
-This lets the reviewer cherry-pick exactly which issues to fix. If the reviewer selects fixes, proceed to Step 7 Quick fix. If "Merge as-is", proceed to Step 7 Merge.
+"Record" items are non-blocking — they get posted as a follow-up comment on the PR/issue but do not prevent merging. "Quick fix" items are applied immediately before merging.
 
-If any actionable PR / issue comment from Step 1g is still open, `Merge as-is` must **not** be your recommendation. Recommend either **Quick fix** or **OnHold** instead.
+If any actionable PR / issue comment from Step 1b is still open, `Approve & Merge` must **not** be your recommendation. Recommend either **Quick fix** or **OnHold** instead.
 
 ### Step 7: Execute decision
 
-**If Merge:**
-1. Print the PR URL prominently: `https://github.com/CodingThrust/problem-reductions/pull/<number>`
-2. Say: "Please merge this PR in your browser. After merging, I'll move the linked issue to Done."
-3. Wait for user confirmation, then move the project board item to `Done`:
+**If Approve & Merge:**
+1. If any "Record" items were selected, post them as a follow-up comment:
+   ```bash
+   COMMENT_FILE=$(mktemp)
+   cat > "$COMMENT_FILE" <<'EOF'
+   **Follow-up items** (recorded during final review):
+   - [item 1]
+   - [item 2]
+   EOF
+   python3 scripts/pipeline_pr.py comment --repo "$REPO" --pr "<number>" --body-file "$COMMENT_FILE"
+   rm -f "$COMMENT_FILE"
+   ```
+2. Approve and merge the PR (approve may fail if you are the PR author — that's OK, continue to merge):
+   ```bash
+   gh pr review <number> --approve || true
+   gh pr merge <number> --squash --delete-branch
+   ```
+3. Move the project board item to `Done`:
    ```bash
    python3 scripts/pipeline_board.py move <ITEM_ID> done
    ```
@@ -305,7 +333,7 @@ If any actionable PR / issue comment from Step 1g is still open, `Merge as-is` m
 
 **If Quick fix:**
 1. Apply only the fixes the reviewer selected in Step 6.
-2. Checkout the PR branch in a worktree, apply fixes, commit, push.
+2. Work in the worktree from Step 0, apply fixes, commit, push.
 3. After push, go back to Step 6 to re-confirm the decision.
 
 **If Reject:**
