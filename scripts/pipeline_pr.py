@@ -381,6 +381,73 @@ def build_linked_issue_result(
     }
 
 
+def build_linked_issue_context(
+    repo: str,
+    pr_number: int,
+    *,
+    linked_issue_number: int | None,
+    linked_issue: dict | None,
+) -> dict:
+    linked_issue_comments = (
+        fetch_issue_comments(repo, linked_issue_number)
+        if linked_issue_number is not None
+        else []
+    )
+    return build_linked_issue_result(
+        pr_number=pr_number,
+        linked_issue_number=linked_issue_number,
+        linked_issue=linked_issue,
+        linked_issue_comments=linked_issue_comments,
+    )
+
+
+def build_context_result(
+    repo: str,
+    snapshot: dict,
+    comments: dict,
+    linked_issue_result: dict,
+) -> dict:
+    return {
+        "repo": repo,
+        "pr_number": snapshot.get("number"),
+        "title": snapshot.get("title"),
+        "body": snapshot.get("body"),
+        "state": snapshot.get("state"),
+        "url": snapshot.get("url"),
+        "mergeable": snapshot.get("mergeable"),
+        "head_ref_name": snapshot.get("head_ref_name"),
+        "base_ref_name": snapshot.get("base_ref_name"),
+        "head_sha": snapshot.get("head_sha"),
+        "files": snapshot.get("files", []),
+        "commits": snapshot.get("commits", []),
+        "linked_issue_number": linked_issue_result.get("linked_issue_number"),
+        "linked_issue": linked_issue_result.get("linked_issue"),
+        "linked_issue_comments": linked_issue_result.get("linked_issue_comments", []),
+        "human_linked_issue_comments": linked_issue_result.get(
+            "human_linked_issue_comments", []
+        ),
+        "issue_context_text": linked_issue_result.get(
+            "issue_context_text", "No linked issue found."
+        ),
+        "comments": comments,
+        "ci": snapshot.get("ci"),
+        "codecov": snapshot.get("codecov"),
+        "snapshot": snapshot,
+    }
+
+
+def build_pr_context(repo: str, pr_number: int) -> dict:
+    snapshot = build_pr_snapshot(repo, pr_number)
+    comments = build_comments_summary(repo, pr_number)
+    linked_issue_result = build_linked_issue_context(
+        repo,
+        pr_number,
+        linked_issue_number=snapshot.get("linked_issue_number"),
+        linked_issue=snapshot.get("linked_issue"),
+    )
+    return build_context_result(repo, snapshot, comments, linked_issue_result)
+
+
 def wait_for_ci(
     fetcher: Callable[[], dict],
     *,
@@ -611,6 +678,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="PR automation helpers.")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
+    context = subparsers.add_parser("context")
+    context.add_argument("--repo")
+    context.add_argument("--pr", type=int)
+    context.add_argument("--current", action="store_true")
+    context.add_argument("--format", choices=["json", "text"], default="json")
+
     for name in [
         "current",
         "snapshot",
@@ -649,6 +722,18 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv or sys.argv[1:])
+
+    if args.command == "context":
+        if args.current:
+            repo = fetch_current_repo()
+            pr_number = fetch_current_pr_data()["number"]
+        else:
+            if not args.repo or args.pr is None:
+                raise ValueError("context requires --current or both --repo and --pr")
+            repo = args.repo
+            pr_number = args.pr
+        emit_result(build_pr_context(repo, pr_number), args.format)
+        return 0
 
     if args.command == "current":
         emit_result(

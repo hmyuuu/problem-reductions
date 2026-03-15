@@ -12,44 +12,38 @@ Resolve PR review comments, fix CI failures, and address codecov coverage gaps f
 Use the shared scripted helpers for deterministic PR metadata, comment, CI, and Codecov collection. Do not rebuild this logic inline with `gh api | python3 -c` unless you are debugging the helper itself.
 
 ```bash
-# Get current branch PR context
-CURRENT=$(python3 scripts/pipeline_pr.py current --format json)
-REPO=$(printf '%s\n' "$CURRENT" | python3 -c "import sys,json; print(json.load(sys.stdin)['repo'])")
-PR=$(printf '%s\n' "$CURRENT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pr_number'])")
-
-# Get structured PR state
-SNAPSHOT=$(python3 scripts/pipeline_pr.py snapshot --repo "$REPO" --pr "$PR" --format json)
-COMMENTS=$(python3 scripts/pipeline_pr.py comments --repo "$REPO" --pr "$PR" --format json)
-CI=$(python3 scripts/pipeline_pr.py ci --repo "$REPO" --pr "$PR" --format json)
-CODECOV=$(python3 scripts/pipeline_pr.py codecov --repo "$REPO" --pr "$PR" --format json)
+# Get one bundled mechanical context object for the current branch PR
+CONTEXT=$(python3 scripts/pipeline_pr.py context --current --format json)
+REPO=$(printf '%s\n' "$CONTEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['repo'])")
+PR=$(printf '%s\n' "$CONTEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['pr_number'])")
 
 # Extract the current head SHA when needed
-HEAD_SHA=$(printf '%s\n' "$SNAPSHOT" | python3 -c "import sys,json; print(json.load(sys.stdin)['head_sha'])")
+HEAD_SHA=$(printf '%s\n' "$CONTEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['head_sha'])")
 ```
 
 ### 1a. Fetch Review Comments
 
 **Check ALL four sources.** User inline comments are the most commonly missed — do not skip any.
 
-Read the `COMMENTS` JSON and inspect these arrays:
+Read the `CONTEXT["comments"]` object and inspect these arrays:
 - `inline_comments` — all inline review comments
 - `reviews` — top-level review bodies
 - `human_issue_comments` — PR conversation comments excluding bots and Codecov
 - `human_linked_issue_comments` — linked issue comments excluding bots
 - `codecov_comments` — PR conversation comments from Codecov only
 
-Use `COMMENTS["counts"]` to verify whether any source is genuinely empty before assuming there is no feedback.
+Use `CONTEXT["comments"]["counts"]` to verify whether any source is genuinely empty before assuming there is no feedback.
 
 ### 1b. Check CI Status
 
-Read the `CI` JSON. It includes:
+Read `CONTEXT["ci"]`. It includes:
 - `state` — `pending`, `failure`, or `success`
 - `runs` — normalized check-run details
 - `pending` / `failing` / `succeeding` counts
 
 ### 1c. Check Codecov Report
 
-Read the `CODECOV` JSON. It includes:
+Read `CONTEXT["codecov"]`. It includes:
 - `found` — whether a Codecov comment is present
 - `patch_coverage`
 - `project_coverage`

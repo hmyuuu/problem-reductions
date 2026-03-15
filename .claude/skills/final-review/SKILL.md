@@ -64,16 +64,16 @@ TITLE=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; print(json.load(sys
 
 Collect all information needed for the review:
 
-1a. **PR metadata**: prefer the scripted snapshot:
+1a. **PR metadata and comment context**: prefer the bundled scripted context:
    ```bash
    REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
-   SNAPSHOT=$(python3 scripts/pipeline_pr.py snapshot --repo "$REPO" --pr <number> --format json)
+   CONTEXT=$(python3 scripts/pipeline_pr.py context --repo "$REPO" --pr <number> --format json)
    ```
-   This includes title, body, labels, files, additions, deletions, commits, branch names, mergeability, linked issue, CI summary, and Codecov summary in one JSON payload.
+   This includes title, body, labels, files, additions, deletions, commits, branch names, mergeability, comment summaries, linked issue data, issue context text, CI summary, and Codecov summary in one JSON payload.
 
 1b. **PR diff**: `gh pr diff <number>` — read the full diff to understand all changes.
 
-1c. **Linked issue**: read it from `SNAPSHOT["linked_issue_number"]` / `SNAPSHOT["linked_issue"]` instead of reparsing the PR body manually.
+1c. **Linked issue**: read it from `CONTEXT["linked_issue_number"]` / `CONTEXT["linked_issue"]` / `CONTEXT["issue_context_text"]` instead of reparsing the PR body manually.
 
 1d. **Determine PR type**: From labels and title, classify as `[Model]` or `[Rule]`.
   - For `[Model]`: identify the problem name being added
@@ -84,12 +84,11 @@ Collect all information needed for the review:
 1f. **Check for conflicts with main**: Run `gh pr view <number> --json mergeable`. If there are merge conflicts, launch a subagent to merge `origin/main` into the PR branch (in a worktree) and push the merge commit.
 
 1g. **PR / issue comment audit (REQUIRED)**: Final review must check the comment history before recommending merge.
-  - Set `REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)`
-  - Fetch and read:
-    - PR conversation comments: `gh api repos/$REPO/issues/<number>/comments`
-    - PR inline review comments: `gh api repos/$REPO/pulls/<number>/comments`
-    - PR review bodies: `gh api repos/$REPO/pulls/<number>/reviews`
-    - linked issue comments, if an issue exists
+  - Read the following from `CONTEXT["comments"]`:
+    - `human_issue_comments`
+    - `inline_comments`
+    - `reviews`
+    - `human_linked_issue_comments`
   - Build a list of every actionable comment and classify each as:
     - `addressed`
     - `superseded / no longer applicable`

@@ -4,6 +4,8 @@ from unittest import mock
 
 from pipeline_pr import (
     build_current_pr_context,
+    build_context_result,
+    build_pr_context,
     build_linked_issue_result,
     build_snapshot,
     create_pr,
@@ -272,6 +274,99 @@ class PipelinePrHelpersTests(unittest.TestCase):
         self.assertIn("# [Model] GraphPartitioning", result["issue_context_text"])
         self.assertIn("**maintainer** (2026-03-15T09:00:00Z):", result["issue_context_text"])
 
+    def test_build_context_result_merges_snapshot_comments_and_issue_context(self) -> None:
+        snapshot = {
+            "number": 570,
+            "title": "Fix #117: Add GraphPartitioning model",
+            "body": "Closes #117",
+            "state": "OPEN",
+            "url": "https://github.com/CodingThrust/problem-reductions/pull/570",
+            "mergeable": "MERGEABLE",
+            "head_ref_name": "feature/graph-partitioning",
+            "base_ref_name": "main",
+            "head_sha": "abc123",
+            "linked_issue_number": 117,
+            "linked_issue": {"number": 117, "title": "[Model] GraphPartitioning"},
+            "files": ["src/models/graph/graph_partitioning.rs"],
+            "commits": ["abc123", "def456"],
+            "ci": {"state": "success"},
+            "codecov": {"found": True, "patch_coverage": 92.0},
+            "counts": {"files": 1, "commits": 2},
+        }
+        comments = {
+            "inline_comments": [{"user": "alice", "body": "nit"}],
+            "reviews": [{"user": "bob", "body": "looks good", "state": "COMMENTED"}],
+            "human_issue_comments": [{"user": "carol", "body": "please update docs"}],
+            "counts": {"inline_comments": 1},
+        }
+        linked_issue_result = {
+            "linked_issue_number": 117,
+            "linked_issue": {"number": 117, "title": "[Model] GraphPartitioning"},
+            "linked_issue_comments": [{"author": "maintainer", "body": "Use paper notation"}],
+            "human_linked_issue_comments": [{"author": "maintainer", "body": "Use paper notation"}],
+            "issue_context_text": "# [Model] GraphPartitioning\n\nImplement the model.",
+        }
+
+        context = build_context_result(
+            "CodingThrust/problem-reductions",
+            snapshot,
+            comments,
+            linked_issue_result,
+        )
+
+        self.assertEqual(context["repo"], "CodingThrust/problem-reductions")
+        self.assertEqual(context["pr_number"], 570)
+        self.assertEqual(context["title"], "Fix #117: Add GraphPartitioning model")
+        self.assertEqual(context["comments"]["inline_comments"][0]["user"], "alice")
+        self.assertEqual(context["ci"]["state"], "success")
+        self.assertEqual(context["codecov"]["patch_coverage"], 92.0)
+        self.assertEqual(context["linked_issue_number"], 117)
+        self.assertIn("GraphPartitioning", context["issue_context_text"])
+
+    @mock.patch("pipeline_pr.build_linked_issue_context")
+    @mock.patch("pipeline_pr.build_comments_summary")
+    @mock.patch("pipeline_pr.build_pr_snapshot")
+    def test_build_pr_context_assembles_existing_helper_results(
+        self,
+        build_pr_snapshot: mock.Mock,
+        build_comments_summary: mock.Mock,
+        build_linked_issue_context: mock.Mock,
+    ) -> None:
+        build_pr_snapshot.return_value = {
+            "number": 570,
+            "title": "Fix #117: Add GraphPartitioning model",
+            "body": "Closes #117",
+            "state": "OPEN",
+            "url": "https://github.com/CodingThrust/problem-reductions/pull/570",
+            "mergeable": "MERGEABLE",
+            "head_ref_name": "feature/graph-partitioning",
+            "base_ref_name": "main",
+            "head_sha": "abc123",
+            "linked_issue_number": 117,
+            "linked_issue": {"number": 117, "title": "[Model] GraphPartitioning"},
+            "files": ["src/models/graph/graph_partitioning.rs"],
+            "commits": ["abc123"],
+            "ci": {"state": "success"},
+            "codecov": {"found": True},
+            "counts": {"files": 1, "commits": 1},
+        }
+        build_comments_summary.return_value = {"inline_comments": [], "counts": {"inline_comments": 0}}
+        build_linked_issue_context.return_value = {
+            "linked_issue_number": 117,
+            "linked_issue": {"number": 117, "title": "[Model] GraphPartitioning"},
+            "linked_issue_comments": [],
+            "human_linked_issue_comments": [],
+            "issue_context_text": "# [Model] GraphPartitioning",
+        }
+
+        context = build_pr_context("CodingThrust/problem-reductions", 570)
+
+        build_pr_snapshot.assert_called_once_with("CodingThrust/problem-reductions", 570)
+        build_comments_summary.assert_called_once_with("CodingThrust/problem-reductions", 570)
+        build_linked_issue_context.assert_called_once()
+        self.assertEqual(context["pr_number"], 570)
+        self.assertEqual(context["issue_context_text"], "# [Model] GraphPartitioning")
+
     def test_wait_for_ci_polls_until_terminal_state(self) -> None:
         summaries = [
             {"state": "pending", "total": 2, "pending": 1, "failing": 0},
@@ -448,6 +543,24 @@ class PipelinePrHelpersTests(unittest.TestCase):
         )
         self.assertEqual(create_args.command, "create")
         self.assertEqual(create_args.body_file, "/tmp/pr-body.md")
+
+        context_args = parse_args(
+            [
+                "context",
+                "--repo",
+                "CodingThrust/problem-reductions",
+                "--pr",
+                "570",
+                "--format",
+                "json",
+            ]
+        )
+        self.assertEqual(context_args.command, "context")
+        self.assertEqual(context_args.pr, 570)
+
+        current_context_args = parse_args(["context", "--current", "--format", "json"])
+        self.assertEqual(current_context_args.command, "context")
+        self.assertTrue(current_context_args.current)
 
 
 if __name__ == "__main__":
