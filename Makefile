@@ -381,11 +381,21 @@ cli-demo: cli
 #        make run-pipeline N=97     (processes specific issue)
 run-pipeline:
 	@. scripts/make_helpers.sh; \
+	state_file=$${STATE_FILE:-/tmp/problemreductions-ready-state.json}; \
 	if [ -n "$(N)" ]; then \
-		PROMPT=$$(skill_prompt project-pipeline "/project-pipeline $(N)" "process GitHub issue $(N)"); \
+		issue="$(N)"; \
 	else \
-		PROMPT=$$(skill_prompt project-pipeline "/project-pipeline" "pick and process the next Ready issue"); \
+		status=0; \
+		selection=$$(board_next_json ready "" "" "$$state_file") || status=$$?; \
+		if [ "$$status" -eq 1 ]; then \
+			echo "No Ready issues are currently eligible."; \
+			exit 1; \
+		elif [ "$$status" -ne 0 ]; then \
+			exit "$$status"; \
+		fi; \
+		issue=$$(printf '%s\n' "$$selection" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['issue_number'] or data['number'])"); \
 	fi; \
+	PROMPT=$$(skill_prompt project-pipeline "/project-pipeline $$issue" "process GitHub issue $$issue"); \
 	run_agent "pipeline-output.log" "$$PROMPT"
 
 # Poll Ready column for new issues and run-pipeline when new ones appear
