@@ -264,6 +264,31 @@ def ready_entries(board_data: dict) -> dict[str, dict]:
     return entries
 
 
+def status_items(board_data: dict, status_name: str) -> list[dict]:
+    items = []
+    for item in board_data.get("items", []):
+        if item.get("status") != status_name:
+            continue
+
+        content = item.get("content") or {}
+        if content.get("type") != "Issue":
+            continue
+
+        number = content.get("number")
+        if number is None:
+            continue
+
+        entry = build_entry(
+            item,
+            number=int(number),
+            issue_number=int(number),
+        )
+        entry["item_id"] = item_identity(item)
+        items.append(entry)
+
+    return sorted(items, key=lambda entry: (entry["number"], entry["item_id"]))
+
+
 def review_entries(
     board_data: dict,
     repo: str,
@@ -917,8 +942,8 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ack_parser.add_argument("item_id")
 
     list_parser = subparsers.add_parser("list")
-    list_parser.add_argument("mode", choices=["review"])
-    list_parser.add_argument("--repo", required=True)
+    list_parser.add_argument("mode", choices=["ready", "in-progress", "review"])
+    list_parser.add_argument("--repo")
     list_parser.add_argument("--owner", default="CodingThrust")
     list_parser.add_argument("--project-number", type=int, default=8)
     list_parser.add_argument("--limit", type=int, default=500)
@@ -950,7 +975,15 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.command == "list":
+        if args.mode == "review" and not args.repo:
+            raise SystemExit("--repo is required in list review mode")
         board_data = fetch_board_items(args.owner, args.project_number, args.limit)
+        if args.mode == "ready":
+            items = status_items(board_data, STATUS_READY)
+            return print_candidate_list(args.mode, items, fmt=args.format)
+        if args.mode == "in-progress":
+            items = status_items(board_data, STATUS_IN_PROGRESS)
+            return print_candidate_list(args.mode, items, fmt=args.format)
         if args.mode == "review":
             items = review_candidates(
                 board_data,

@@ -41,15 +41,18 @@ This skill runs **fully autonomously** — no confirmation prompts, no user ques
 #### 0a. Fetch Ready Issues
 
 ```bash
-gh project item-list 8 --owner CodingThrust --format json --limit 500
+READY=$(python3 scripts/pipeline_board.py list ready --format json)
+IN_PROGRESS=$(python3 scripts/pipeline_board.py list in-progress --format json)
 ```
 
-Filter items where `status == "Ready"`. Partition into `[Model]` and `[Rule]` buckets.
+Use `READY["items"]` as the candidate set. Each item includes `item_id`, `issue_number`, `title`, and `status`.
+
+Partition `READY["items"]` into `[Model]` and `[Rule]` buckets by title prefix.
 
 #### 0b. Gather Context for Ranking
 
 1. **Existing problems:** Grep for problem struct definitions in the codebase: `grep -r "^pub struct" src/models/ | sed 's/.*pub struct \([A-Za-z]*\).*/\1/'` to get all problem names currently implemented on `main`.
-2. **Pending rules:** From the full project board JSON, collect all `[Rule]` issues that are in "Ready" or "In Progress" status. Parse their source/target problem names (e.g., `[Rule] BinPacking to ILP` → source=BinPacking, target=ILP).
+2. **Pending rules:** From `READY["items"]` plus `IN_PROGRESS["items"]`, collect all `[Rule]` issues that are in `Ready` or `In progress` status. Parse their source/target problem names (e.g., `[Rule] BinPacking to ILP` → source=BinPacking, target=ILP).
 
 #### 0c. Check Eligibility
 
@@ -98,18 +101,42 @@ Ready issues (ranked):
 
 #### 0f. Pick Issues
 
-**If a specific issue number was provided:** verify it is in the Ready column. If it is blocked, STOP with a message explaining which model is missing.
+**If a specific issue number was provided:** validate it through the scripted selector:
+
+```bash
+STATE_FILE=/tmp/problemreductions-ready-selection.json
+NEXT=$(python3 scripts/pipeline_board.py next ready "$STATE_FILE" --number <number> --format json)
+```
+
+If the command exits with status 1, STOP with: `Issue #N is not currently in the Ready column.`
+
+If it is blocked by the dependency check above, STOP with a message explaining which model is missing.
+
+After successful validation, extract `ITEM_ID`, `ISSUE`, and `TITLE` from `NEXT` using the same commands shown below.
 
 **If `--all`:** proceed with all eligible issues in ranked order (highest score first). Models before Rules at same score. Blocked rules are skipped. After each issue is processed, re-check eligibility for remaining rules (a just-merged Model may unblock them).
 
-**Otherwise (no args):** pick the highest-scored eligible (non-blocked) issue and proceed immediately (no confirmation).
+**Otherwise (no args):** pick the highest-scored eligible (non-blocked) issue and proceed immediately (no confirmation). After picking the issue number, resolve its current board metadata through the scripted selector:
+
+```bash
+STATE_FILE=/tmp/problemreductions-ready-selection.json
+NEXT=$(python3 scripts/pipeline_board.py next ready "$STATE_FILE" --number <chosen-issue-number> --format json)
+```
+
+Extract the board item metadata from `NEXT`:
+
+```bash
+ITEM_ID=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['item_id'])")
+ISSUE=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; data=json.load(sys.stdin); print(data['issue_number'] or data['number'])")
+TITLE=$(printf '%s\n' "$NEXT" | python3 -c "import sys,json; print(json.load(sys.stdin)['title'])")
+```
 
 ### 1. Create Worktree
 
 Create an isolated git worktree for this issue so the main working directory stays clean:
 
 ```bash
-WORKTREE=$(python3 scripts/pipeline_worktree.py create-issue --issue <number> --slug <slug> --base origin/main --format json)
+WORKTREE=$(python3 scripts/pipeline_worktree.py create-issue --issue "$ISSUE" --slug <slug> --base origin/main --format json)
 BRANCH=$(printf '%s\n' "$WORKTREE" | python3 -c "import sys,json; print(json.load(sys.stdin)['branch'])")
 WORKTREE_DIR=$(printf '%s\n' "$WORKTREE" | python3 -c "import sys,json; print(json.load(sys.stdin)['worktree_dir'])")
 cd "$WORKTREE_DIR"
@@ -119,7 +146,7 @@ All subsequent steps run inside the worktree. This ensures the user's main check
 
 ### 2. Move to "In Progress"
 
-Extract the project item ID for the chosen issue from the JSON output (the `id` field of the matching item).
+Use `ITEM_ID` from the `NEXT` JSON payload.
 
 ```bash
 python3 scripts/pipeline_board.py move <ITEM_ID> in-progress
@@ -130,7 +157,7 @@ python3 scripts/pipeline_board.py move <ITEM_ID> in-progress
 Invoke the `issue-to-pr` skill with `--execute` (working directory is the worktree):
 
 ```
-/issue-to-pr <number> --execute
+/issue-to-pr "$ISSUE" --execute
 ```
 
 This handles the full pipeline: fetch issue, verify Good label, research, write plan, create PR, implement, review, fix CI.

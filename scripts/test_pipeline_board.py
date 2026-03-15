@@ -21,6 +21,7 @@ from pipeline_board import (
     process_snapshot,
     review_candidates,
     select_next_entry,
+    status_items,
 )
 
 
@@ -528,6 +529,76 @@ class PipelineBoardReviewCandidateTests(unittest.TestCase):
 
         self.assertEqual(candidates[0]["eligibility"], "waiting-for-copilot")
         self.assertEqual(candidates[0]["reason"], "open PR #570 waiting for Copilot review")
+
+
+class PipelineBoardStatusListTests(unittest.TestCase):
+    def test_status_items_list_ready_issues(self) -> None:
+        items = status_items(
+            {
+                "items": [
+                    make_issue_item(
+                        "PVTI_1",
+                        101,
+                        status="Ready",
+                        title="[Model] ExactCoverBy3Sets",
+                    ),
+                    make_issue_item(
+                        "PVTI_2",
+                        102,
+                        status="In progress",
+                        title="[Rule] A to B",
+                    ),
+                ]
+            },
+            STATUS_READY,
+        )
+        self.assertEqual(
+            items,
+            [
+                {
+                    "item_id": "PVTI_1",
+                    "number": 101,
+                    "issue_number": 101,
+                    "pr_number": None,
+                    "status": STATUS_READY,
+                    "title": "[Model] ExactCoverBy3Sets",
+                }
+            ],
+        )
+
+    def test_status_items_list_in_progress_issues(self) -> None:
+        items = status_items(
+            {
+                "items": [
+                    make_issue_item(
+                        "PVTI_1",
+                        101,
+                        status="Ready",
+                        title="[Model] ExactCoverBy3Sets",
+                    ),
+                    make_issue_item(
+                        "PVTI_2",
+                        102,
+                        status="In progress",
+                        title="[Rule] A to B",
+                    ),
+                ]
+            },
+            STATUS_IN_PROGRESS,
+        )
+        self.assertEqual(
+            items,
+            [
+                {
+                    "item_id": "PVTI_2",
+                    "number": 102,
+                    "issue_number": 102,
+                    "pr_number": None,
+                    "status": STATUS_IN_PROGRESS,
+                    "title": "[Rule] A to B",
+                }
+            ],
+        )
 
 
 if __name__ == "__main__":
