@@ -13,6 +13,9 @@ use serde::{Deserialize, Serialize};
 inventory::submit! {
     ProblemSchemaEntry {
         name: "MinimumTardinessSequencing",
+        display_name: "Minimum Tardiness Sequencing",
+        aliases: &[],
+        dimensions: &[],
         module_path: module_path!(),
         description: "Schedule unit-length tasks with precedence constraints and deadlines to minimize the number of tardy tasks",
         fields: &[
@@ -178,7 +181,7 @@ impl OptimizationProblem for MinimumTardinessSequencing {
 }
 
 crate::declare_variants! {
-    MinimumTardinessSequencing => "2^num_tasks",
+    default opt MinimumTardinessSequencing => "2^num_tasks",
 }
 
 #[cfg(test)]

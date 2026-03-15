@@ -107,7 +107,7 @@ fn test_minimum_tardiness_sequencing_brute_force() {
 #[test]
 fn test_minimum_tardiness_sequencing_brute_force_no_precedences() {
     // Without precedences, Moore's algorithm gives optimal
-    // 3 tasks: deadlines 1, 2, 1. Best is to schedule task with deadline 1 first.
+    // 3 tasks: deadlines 1, 3, 2. Best is to schedule task with deadline 1 first.
     let problem = MinimumTardinessSequencing::new(3, vec![1, 3, 2], vec![]);
     let solver = BruteForce::new();
     let solution = solver.find_best(&problem).expect("should find a solution");

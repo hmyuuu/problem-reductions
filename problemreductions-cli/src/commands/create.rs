@@ -779,6 +779,21 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
                     .collect::<Result<Vec<_>>>()?,
                 _ => vec![],
             };
+            anyhow::ensure!(
+                deadlines.len() == num_tasks,
+                "deadlines length ({}) must equal num_tasks ({})",
+                deadlines.len(),
+                num_tasks
+            );
+            for &(pred, succ) in &precedences {
+                anyhow::ensure!(
+                    pred < num_tasks && succ < num_tasks,
+                    "precedence index out of range: ({}, {}) but num_tasks = {}",
+                    pred,
+                    succ,
+                    num_tasks
+                );
+            }
             (
                 ser(MinimumTardinessSequencing::new(
                     num_tasks,
