@@ -231,8 +231,10 @@ Flags by problem type:
   MaximumSetPacking               --sets [--weights]
   MinimumSetCovering              --universe, --sets [--weights]
   X3C (ExactCoverBy3Sets)         --universe, --sets (3 elements each)
+  SetBasis                        --universe, --sets, --k
   BicliqueCover                   --left, --right, --biedges, --k
   BMF                             --matrix (0/1), --rank
+  SteinerTree                     --graph, --edge-weights, --terminals
   CVP                             --basis, --target-vec [--bounds]
   OptimalLinearArrangement        --graph, --bound
   RuralPostman (RPP)              --graph, --edge-weights, --required-edges, --bound
@@ -263,7 +265,8 @@ Examples:
   pred create MIS/UnitDiskGraph --positions \"0,0;1,0;0.5,0.8\" --radius 1.5
   pred create MIS --random --num-vertices 10 --edge-prob 0.3
   pred create FVS --arcs \"0>1,1>2,2>0\" --weights 1,1,1
-  pred create X3C --universe 9 --sets \"0,1,2;0,2,4;3,4,5;3,5,7;6,7,8;1,4,6;2,5,8\"")]
+  pred create X3C --universe 9 --sets \"0,1,2;0,2,4;3,4,5;3,5,7;6,7,8;1,4,6;2,5,8\"
+  pred create SetBasis --universe 4 --sets \"0,1;1,2;0,2;0,1,2\" --k 3")]
 pub struct CreateArgs {
     /// Problem type (e.g., MIS, QUBO, SAT). Omit when using --example.
     #[arg(value_parser = crate::problem_name::ProblemNameParser)]
@@ -367,6 +370,9 @@ pub struct CreateArgs {
     /// Variable bounds for CVP as "lower,upper" (e.g., "-10,10") [default: -10,10]
     #[arg(long, allow_hyphen_values = true)]
     pub bounds: Option<String>,
+    /// Terminal vertices for SteinerTree (comma-separated indices, e.g., "0,2,4")
+    #[arg(long)]
+    pub terminals: Option<String>,
     /// Tree edge list for IsomorphicSpanningTree (e.g., 0-1,1-2,2-3)
     #[arg(long)]
     pub tree: Option<String>,

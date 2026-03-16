@@ -18,7 +18,7 @@ use problemreductions::topology::{
     UnitDiskGraph,
 };
 use serde::Serialize;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Check if all data flags are None (no problem-specific input provided).
 fn all_data_flags_empty(args: &CreateArgs) -> bool {
@@ -51,6 +51,7 @@ fn all_data_flags_empty(args: &CreateArgs) -> bool {
         && args.basis.is_none()
         && args.target_vec.is_none()
         && args.bounds.is_none()
+        && args.terminals.is_none()
         && args.tree.is_none()
         && args.required_edges.is_none()
         && args.bound.is_none()
@@ -212,6 +213,21 @@ fn type_format_hint(type_name: &str, graph_type: Option<&str>) -> &'static str {
     }
 }
 
+fn cli_flag_name(field_name: &str) -> String {
+    match field_name {
+        "universe_size" => "universe".to_string(),
+        "collection" | "subsets" => "sets".to_string(),
+        "left_size" => "left".to_string(),
+        "right_size" => "right".to_string(),
+        "edges" => "biedges".to_string(),
+        "vertex_weights" => "weights".to_string(),
+        "edge_lengths" => "edge-weights".to_string(),
+        "num_tasks" => "n".to_string(),
+        "precedences" => "precedence-pairs".to_string(),
+        _ => field_name.replace('_', "-"),
+    }
+}
+
 fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
     match canonical {
         "MaximumIndependentSet"
@@ -239,6 +255,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         }
         "PartitionIntoTriangles" => "--graph 0-1,1-2,0-2",
         "Factoring" => "--target 15 --m 4 --n 4",
+        "SteinerTree" => "--graph 0-1,1-2,1-3,3-4 --edge-weights 2,2,1,1 --terminals 0,2,4",
         "OptimalLinearArrangement" => "--graph 0-1,1-2,2-3 --bound 5",
         "MinimumFeedbackArcSet" => "--arcs \"0>1,1>2,2>0\"",
         "RuralPostman" => {
@@ -246,6 +263,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         }
         "SubgraphIsomorphism" => "--graph 0-1,1-2,2-0 --pattern 0-1",
         "SubsetSum" => "--sizes 3,7,1,8,2,4 --target 11",
+        "SetBasis" => "--universe 4 --sets \"0,1;1,2;0,2;0,1,2\" --k 3",
         "ShortestCommonSupersequence" => "--strings \"0,1,2;1,2,0\" --bound 4",
         _ => "",
     }
@@ -278,7 +296,7 @@ fn print_problem_help(canonical: &str, graph_type: Option<&str>) -> Result<()> {
                 let hint = type_format_hint(&field.type_name, graph_type);
                 eprintln!(
                     "  --{:<16} {} ({})",
-                    field.name.replace('_', "-"),
+                    cli_flag_name(&field.name),
                     field.description,
                     hint
                 );
@@ -358,6 +376,19 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
         | "MaximumClique"
         | "MinimumDominatingSet" => {
             create_vertex_weight_problem(args, canonical, graph_type, &resolved_variant)?
+        }
+
+        // SteinerTree (graph + edge weights + terminals)
+        "SteinerTree" => {
+            let (graph, _) = parse_graph(args).map_err(|e| {
+                anyhow::anyhow!(
+                    "{e}\n\nUsage: pred create SteinerTree --graph 0-1,1-2,1-3,3-4 --edge-weights 2,2,1,1 --terminals 0,2,4"
+                )
+            })?;
+            let edge_weights = parse_edge_weights(args, graph.num_edges())?;
+            let terminals = parse_terminals(args, graph.num_vertices())?;
+            let data = ser(SteinerTree::new(graph, edge_weights, terminals))?;
+            (data, resolved_variant.clone())
         }
 
         // Graph partitioning (graph only, no weights)
@@ -698,6 +729,41 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             (
                 ser(problemreductions::models::set::ExactCoverBy3Sets::new(
                     universe, subsets,
+                ))?,
+                resolved_variant.clone(),
+            )
+        }
+
+        // SetBasis
+        "SetBasis" => {
+            let universe = args.universe.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "SetBasis requires --universe, --sets, and --k\n\n\
+                     Usage: pred create SetBasis --universe 4 --sets \"0,1;1,2;0,2;0,1,2\" --k 3"
+                )
+            })?;
+            let k = args.k.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "SetBasis requires --k\n\n\
+                     Usage: pred create SetBasis --universe 4 --sets \"0,1;1,2;0,2;0,1,2\" --k 3"
+                )
+            })?;
+            let sets = parse_sets(args)?;
+            for (i, set) in sets.iter().enumerate() {
+                for &element in set {
+                    if element >= universe {
+                        bail!(
+                            "Set {} contains element {} which is outside universe of size {}",
+                            i,
+                            element,
+                            universe
+                        );
+                    }
+                }
+            }
+            (
+                ser(problemreductions::models::set::SetBasis::new(
+                    universe, sets, k,
                 ))?,
                 resolved_variant.clone(),
             )
@@ -1298,6 +1364,32 @@ fn parse_vertex_weights(args: &CreateArgs, num_vertices: usize) -> Result<Vec<i3
     }
 }
 
+/// Parse `--terminals` as comma-separated vertex indices.
+fn parse_terminals(args: &CreateArgs, num_vertices: usize) -> Result<Vec<usize>> {
+    let s = args
+        .terminals
+        .as_deref()
+        .ok_or_else(|| anyhow::anyhow!("SteinerTree requires --terminals (e.g., \"0,2,4\")"))?;
+    let terminals: Vec<usize> = s
+        .split(',')
+        .map(|t| t.trim().parse::<usize>())
+        .collect::<std::result::Result<Vec<_>, _>>()
+        .context("invalid terminal index")?;
+    for &t in &terminals {
+        anyhow::ensure!(
+            t < num_vertices,
+            "terminal {t} >= num_vertices ({num_vertices})"
+        );
+    }
+    let distinct_terminals: BTreeSet<_> = terminals.iter().copied().collect();
+    anyhow::ensure!(
+        distinct_terminals.len() == terminals.len(),
+        "terminals must be distinct"
+    );
+    anyhow::ensure!(terminals.len() >= 2, "at least 2 terminals required");
+    Ok(terminals)
+}
+
 /// Parse `--edge-weights` as edge weights (i32), defaulting to all 1s.
 fn parse_edge_weights(args: &CreateArgs, num_edges: usize) -> Result<Vec<i32>> {
     match &args.edge_weights {
@@ -1680,6 +1772,34 @@ fn create_random(
             (data, variant)
         }
 
+        // SteinerTree
+        "SteinerTree" => {
+            anyhow::ensure!(
+                num_vertices >= 2,
+                "SteinerTree random generation requires --num-vertices >= 2"
+            );
+            let edge_prob = args.edge_prob.unwrap_or(0.5);
+            if !(0.0..=1.0).contains(&edge_prob) {
+                bail!("--edge-prob must be between 0.0 and 1.0");
+            }
+            let mut state = util::lcg_init(args.seed);
+            let graph = util::create_random_graph(num_vertices, edge_prob, Some(state));
+            // Advance state past the graph generation
+            for _ in 0..num_vertices * num_vertices {
+                util::lcg_step(&mut state);
+            }
+            let edge_weights: Vec<i32> = (0..graph.num_edges())
+                .map(|_| (util::lcg_step(&mut state) * 9.0) as i32 + 1)
+                .collect();
+            let num_terminals = std::cmp::max(2, num_vertices * 2 / 5);
+            let terminals = util::lcg_choose(&mut state, num_vertices, num_terminals);
+            let variant = variant_map(&[("graph", "SimpleGraph"), ("weight", "i32")]);
+            (
+                ser(SteinerTree::new(graph, edge_weights, terminals))?,
+                variant,
+            )
+        }
+
         // SpinGlass
         "SpinGlass" => {
             let edge_prob = args.edge_prob.unwrap_or(0.5);
@@ -1730,7 +1850,7 @@ fn create_random(
             "Random generation is not supported for {canonical}. \
              Supported: graph-based problems (MIS, MVC, MaxCut, MaxClique, \
              MaximumMatching, MinimumDominatingSet, SpinGlass, KColoring, TravelingSalesman, \
-             OptimalLinearArrangement, HamiltonianPath)"
+             SteinerTree, OptimalLinearArrangement, HamiltonianPath)"
         ),
     };
 
