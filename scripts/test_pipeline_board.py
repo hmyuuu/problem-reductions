@@ -210,6 +210,46 @@ class PipelineBoardPollTests(unittest.TestCase):
             )
             self.assertIsNone(no_item)
 
+    def test_parse_args_accepts_final_review_list_mode(self) -> None:
+        import pipeline_board
+
+        args = pipeline_board.parse_args(["list", "final-review", "--repo", "CodingThrust/problem-reductions"])
+
+        self.assertEqual(args.command, "list")
+        self.assertEqual(args.mode, "final-review")
+
+    def test_main_lists_final_review_items(self) -> None:
+        import pipeline_board
+
+        board_data = {
+            "items": [make_issue_item("PVTI_30", 239, status="Final review", title="[Model] BalancedCompleteBipartiteSubgraph")]
+        }
+
+        with (
+            patch.object(pipeline_board, "fetch_board_items", return_value=board_data) as fetch_board_items,
+            patch.object(pipeline_board, "print_candidate_list", return_value=0) as print_candidate_list,
+        ):
+            rc = pipeline_board.main(
+                ["list", "final-review", "--repo", "CodingThrust/problem-reductions", "--format", "json"]
+            )
+
+        self.assertEqual(rc, 0)
+        fetch_board_items.assert_called_once()
+        print_candidate_list.assert_called_once_with(
+            "final-review",
+            [
+                {
+                    "number": 239,
+                    "issue_number": 239,
+                    "pr_number": None,
+                    "status": "Final review",
+                    "title": "[Model] BalancedCompleteBipartiteSubgraph",
+                    "item_id": "PVTI_30",
+                }
+            ],
+            fmt="json",
+        )
+
 
 class ReviewCandidateQueueTests(unittest.TestCase):
     def test_select_entry_from_entries_tracks_pending_until_ack(self) -> None:

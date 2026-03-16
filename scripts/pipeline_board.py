@@ -1232,7 +1232,10 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     ack_parser.add_argument("item_id")
 
     list_parser = subparsers.add_parser("list")
-    list_parser.add_argument("mode", choices=["ready", "in-progress", "review-pool", "review"])
+    list_parser.add_argument(
+        "mode",
+        choices=["ready", "in-progress", "review-pool", "review", "final-review"],
+    )
     list_parser.add_argument("--repo")
     list_parser.add_argument("--owner", default="CodingThrust")
     list_parser.add_argument("--project-number", type=int, default=8)
@@ -1336,6 +1339,13 @@ def main(argv: list[str] | None = None) -> int:
                 resolve_issue_pr,
                 fetch_pr_info,
                 batch_pr_fetcher=batch_fetch_prs_with_reviews,
+            )
+            return print_candidate_list(args.mode, items, fmt=args.format)
+        if args.mode == "final-review":
+            items = status_items(
+                board_data,
+                STATUS_FINAL_REVIEW,
+                content_types={"Issue", "PullRequest"},
             )
             return print_candidate_list(args.mode, items, fmt=args.format)
         raise SystemExit(f"Unsupported list mode: {args.mode}")
