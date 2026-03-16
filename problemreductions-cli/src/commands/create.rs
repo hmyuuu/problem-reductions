@@ -310,6 +310,9 @@ fn help_flag_name(canonical: &str, field_name: &str) -> String {
     match (canonical, field_name) {
         ("BoundedComponentSpanningForest", "max_components") => return "k".to_string(),
         ("BoundedComponentSpanningForest", "max_weight") => return "bound".to_string(),
+        ("PrimeAttributeName", "num_attributes") => return "universe".to_string(),
+        ("PrimeAttributeName", "dependencies") => return "deps".to_string(),
+        ("PrimeAttributeName", "query_attribute") => return "query".to_string(),
         _ => {}
     }
     // General field-name overrides (previously in cli_flag_name)
@@ -336,6 +339,9 @@ fn help_flag_hint(
 ) -> &'static str {
     match (canonical, field_name) {
         ("BoundedComponentSpanningForest", "max_weight") => "integer",
+        ("PrimeAttributeName", "dependencies") => {
+            "semicolon-separated dependencies: \"0,1>2,3;2,3>0,1\""
+        }
         _ => type_format_hint(type_name, graph_type),
     }
 }
@@ -372,12 +378,7 @@ fn print_problem_help(canonical: &str, graph_type: Option<&str>) -> Result<()> {
                 eprintln!("  --{:<16} {} ({})", flag_name, field.description, hint);
             } else {
                 let hint = help_flag_hint(canonical, &field.name, &field.type_name, graph_type);
-                eprintln!(
-                    "  --{:<16} {} ({})",
-                    help_flag_name(canonical, &field.name),
-                    field.description,
-                    hint
-                );
+                eprintln!("  --{:<16} {} ({})", flag_name, field.description, hint);
             }
         }
     } else {
@@ -414,7 +415,7 @@ fn problem_help_flag_name(
     if canonical == "LengthBoundedDisjointPaths" && field_name == "max_length" {
         return "bound".to_string();
     }
-    field_name.replace('_', "-")
+    help_flag_name(canonical, field_name)
 }
 
 fn lbdp_validation_error(message: &str, usage: Option<&str>) -> anyhow::Error {
@@ -2510,6 +2511,27 @@ mod tests {
                 false,
             ),
             "num-paths-required"
+        );
+    }
+
+    #[test]
+    fn test_problem_help_uses_prime_attribute_name_cli_overrides() {
+        assert_eq!(
+            problem_help_flag_name("PrimeAttributeName", "num_attributes", "usize", false),
+            "universe"
+        );
+        assert_eq!(
+            problem_help_flag_name(
+                "PrimeAttributeName",
+                "dependencies",
+                "Vec<(Vec<usize>, Vec<usize>)>",
+                false,
+            ),
+            "deps"
+        );
+        assert_eq!(
+            problem_help_flag_name("PrimeAttributeName", "query_attribute", "usize", false),
+            "query"
         );
     }
 }

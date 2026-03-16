@@ -92,15 +92,16 @@ fn test_prime_attribute_name_evaluate_invalid_config() {
 fn test_prime_attribute_name_solver() {
     let problem = example1();
     let solver = BruteForce::new();
-    let solutions = solver.find_all_satisfying(&problem);
+    let mut solutions = solver.find_all_satisfying(&problem);
+    solutions.sort();
     assert!(!solutions.is_empty());
     for sol in &solutions {
         assert!(problem.evaluate(sol));
     }
-    // {2,3} should be among the solutions
-    assert!(solutions.contains(&vec![0, 0, 1, 1, 0, 0]));
-    // {0,3} should also be among the solutions
-    assert!(solutions.contains(&vec![1, 0, 0, 1, 0, 0]));
+    assert_eq!(
+        solutions,
+        vec![vec![0, 0, 1, 1, 0, 0], vec![1, 0, 0, 1, 0, 0]]
+    );
 }
 
 #[test]
@@ -137,6 +138,19 @@ fn test_prime_attribute_name_compute_closure() {
     attrs2[0] = true;
     let closure2 = problem.compute_closure(&attrs2);
     assert_eq!(closure2, vec![true, false, false, false, false, false]);
+}
+
+#[test]
+fn test_prime_attribute_name_compute_closure_transitive() {
+    let problem = PrimeAttributeName::new(
+        4,
+        vec![(vec![0], vec![1]), (vec![1], vec![2]), (vec![2], vec![3])],
+        0,
+    );
+    let mut attrs = vec![false; 4];
+    attrs[0] = true;
+    let closure = problem.compute_closure(&attrs);
+    assert_eq!(closure, vec![true, true, true, true]);
 }
 
 #[test]
