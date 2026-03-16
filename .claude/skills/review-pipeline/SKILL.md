@@ -142,23 +142,19 @@ Read the merge result from the report's `Merge Prep` section.
   1. Abort the merge: `git merge --abort` if a merge is still in progress
   2. Post a comment on the PR explaining the situation:
      ```bash
-     gh pr comment <PR_NUMBER> --body "This PR has significant merge conflicts with main ($(N) conflicting files). Moving back to Ready for rework.
+     gh pr comment <PR_NUMBER> --body "This PR has significant merge conflicts with main ($(N) conflicting files). Moving the linked board item back to Ready for rework while leaving the PR open.
 
      Conflicting files:
      $(list of files)
 
      The PR needs to be rebased on current main and conflicts resolved before it can proceed through the review pipeline."
      ```
-  3. Close the PR:
-     ```bash
-     gh pr close <PR_NUMBER>
-     ```
-  4. Move the project item back to `Ready`:
+  3. Move the project item back to `Ready`:
      ```bash
      python3 scripts/pipeline_board.py move <ITEM_ID> ready
      ```
-  5. Report: `PR #N has too many merge conflicts — closed and moved back to Ready for rework.`
-  6. STOP processing this PR.
+  4. Report: `PR #N has too many merge conflicts — left open and moved back to Ready for rework so project-pipeline can resume it later.`
+  5. STOP processing this PR.
 
 ### 2. Fix Copilot Review Comments
 
@@ -350,7 +346,7 @@ Completed: 2/2 | All moved to Final review
 | Worktree left behind on failure | Always clean up with `git worktree remove` in Step 5 |
 | Working in main checkout | All work happens in `.worktrees/` — never modify the main checkout |
 | Skipping merge with main | Always merge origin/main in Step 1a to catch conflicts before fixing comments |
-| Wasting time on heavy conflicts | If >3 files conflict or core impl files are affected, close PR, move to Ready, and let project-pipeline rework it |
+| Wasting time on heavy conflicts | If >3 files conflict or core impl files are affected, leave the PR open, move the board item back to Ready, and let project-pipeline resume it |
 | Ignoring issue comments | Always check the linked issue (`Fix #N`) for human feedback in Step 2a |
 | Only checking Copilot comments | Step 2a checks human PR reviews and linked issue comments too — bot-only review is insufficient |
 | Saying "passed" while deferring issues | If anything remains for maintainer judgment, list it explicitly under `Remaining issues for final review` and mark the agentic result accordingly |
