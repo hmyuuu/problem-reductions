@@ -430,6 +430,15 @@
       "complexity": "1.1996^num_vertices"
     },
     {
+      "name": "MultipleChoiceBranching",
+      "variant": {
+        "weight": "i32"
+      },
+      "category": "graph",
+      "doc_path": "models/graph/struct.MultipleChoiceBranching.html",
+      "complexity": "2^num_arcs"
+    },
+    {
       "name": "OptimalLinearArrangement",
       "variant": {
         "graph": "SimpleGraph"
@@ -599,7 +608,7 @@
     },
     {
       "source": 4,
-      "target": 57,
+      "target": 58,
       "overhead": [
         {
           "field": "num_spins",
@@ -659,7 +668,7 @@
     },
     {
       "source": 13,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -700,7 +709,7 @@
     },
     {
       "source": 20,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -726,7 +735,7 @@
     },
     {
       "source": 21,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -752,7 +761,7 @@
     },
     {
       "source": 22,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -763,7 +772,7 @@
     },
     {
       "source": 22,
-      "target": 61,
+      "target": 62,
       "overhead": [
         {
           "field": "num_elements",
@@ -774,7 +783,7 @@
     },
     {
       "source": 23,
-      "target": 53,
+      "target": 54,
       "overhead": [
         {
           "field": "num_clauses",
@@ -793,7 +802,7 @@
     },
     {
       "source": 24,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -819,7 +828,7 @@
     },
     {
       "source": 27,
-      "target": 57,
+      "target": 58,
       "overhead": [
         {
           "field": "num_spins",
@@ -1134,7 +1143,7 @@
     },
     {
       "source": 39,
-      "target": 51,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -1249,7 +1258,7 @@
       "doc_path": "rules/minimumvertexcover_minimumsetcovering/index.html"
     },
     {
-      "source": 51,
+      "source": 52,
       "target": 13,
       "overhead": [
         {
@@ -1264,8 +1273,8 @@
       "doc_path": "rules/qubo_ilp/index.html"
     },
     {
-      "source": 51,
-      "target": 56,
+      "source": 52,
+      "target": 57,
       "overhead": [
         {
           "field": "num_spins",
@@ -1275,7 +1284,7 @@
       "doc_path": "rules/spinglass_qubo/index.html"
     },
     {
-      "source": 53,
+      "source": 54,
       "target": 4,
       "overhead": [
         {
@@ -1290,7 +1299,7 @@
       "doc_path": "rules/sat_circuitsat/index.html"
     },
     {
-      "source": 53,
+      "source": 54,
       "target": 17,
       "overhead": [
         {
@@ -1305,7 +1314,7 @@
       "doc_path": "rules/sat_coloring/index.html"
     },
     {
-      "source": 53,
+      "source": 54,
       "target": 22,
       "overhead": [
         {
@@ -1320,7 +1329,7 @@
       "doc_path": "rules/sat_ksat/index.html"
     },
     {
-      "source": 53,
+      "source": 54,
       "target": 32,
       "overhead": [
         {
@@ -1335,7 +1344,7 @@
       "doc_path": "rules/sat_maximumindependentset/index.html"
     },
     {
-      "source": 53,
+      "source": 54,
       "target": 41,
       "overhead": [
         {
@@ -1350,8 +1359,8 @@
       "doc_path": "rules/sat_minimumdominatingset/index.html"
     },
     {
-      "source": 56,
-      "target": 51,
+      "source": 57,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
@@ -1361,7 +1370,7 @@
       "doc_path": "rules/spinglass_qubo/index.html"
     },
     {
-      "source": 57,
+      "source": 58,
       "target": 27,
       "overhead": [
         {
@@ -1376,8 +1385,8 @@
       "doc_path": "rules/spinglass_maxcut/index.html"
     },
     {
-      "source": 57,
-      "target": 56,
+      "source": 58,
+      "target": 57,
       "overhead": [
         {
           "field": "num_spins",
@@ -1391,7 +1400,7 @@
       "doc_path": "rules/spinglass_casts/index.html"
     },
     {
-      "source": 62,
+      "source": 63,
       "target": 13,
       "overhead": [
         {
@@ -1406,8 +1415,8 @@
       "doc_path": "rules/travelingsalesman_ilp/index.html"
     },
     {
-      "source": 62,
-      "target": 51,
+      "source": 63,
+      "target": 52,
       "overhead": [
         {
           "field": "num_vars",
