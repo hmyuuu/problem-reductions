@@ -221,6 +221,7 @@ Flags by problem type:
   QUBO                            --matrix
   SpinGlass                       --graph, --couplings, --fields
   KColoring                       --graph, --k
+  MinimumMultiwayCut              --graph, --terminals, --edge-weights
   PartitionIntoTriangles          --graph
   GraphPartitioning               --graph
   BoundedComponentSpanningForest  --graph, --weights, --k, --bound
@@ -419,7 +420,7 @@ pub struct CreateArgs {
     /// Processing lengths for SequencingWithinIntervals (comma-separated, e.g., "3,1,1")
     #[arg(long)]
     pub lengths: Option<String>,
-    /// Terminal vertices for SteinerTree (comma-separated indices, e.g., "0,2,4")
+    /// Terminal vertices for SteinerTree or MinimumMultiwayCut (comma-separated indices, e.g., "0,2,4")
     #[arg(long)]
     pub terminals: Option<String>,
     /// Tree edge list for IsomorphicSpanningTree (e.g., 0-1,1-2,2-3)

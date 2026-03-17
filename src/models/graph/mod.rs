@@ -15,6 +15,7 @@
 //! - [`MaximumMatching`]: Maximum weight matching
 //! - [`TravelingSalesman`]: Traveling Salesman (minimum weight Hamiltonian cycle)
 //! - [`SpinGlass`]: Ising model Hamiltonian
+//! - [`MinimumMultiwayCut`]: Minimum weight multiway cut
 //! - [`HamiltonianPath`]: Hamiltonian path (simple path visiting every vertex)
 //! - [`BicliqueCover`]: Biclique cover on bipartite graphs
 //! - [`BiconnectivityAugmentation`]: Biconnectivity augmentation with weighted potential edges
@@ -47,6 +48,7 @@ pub(crate) mod maximum_matching;
 pub(crate) mod minimum_dominating_set;
 pub(crate) mod minimum_feedback_arc_set;
 pub(crate) mod minimum_feedback_vertex_set;
+pub(crate) mod minimum_multiway_cut;
 pub(crate) mod minimum_sum_multicenter;
 pub(crate) mod minimum_vertex_cover;
 pub(crate) mod multiple_choice_branching;
@@ -76,6 +78,7 @@ pub use maximum_matching::MaximumMatching;
 pub use minimum_dominating_set::MinimumDominatingSet;
 pub use minimum_feedback_arc_set::MinimumFeedbackArcSet;
 pub use minimum_feedback_vertex_set::MinimumFeedbackVertexSet;
+pub use minimum_multiway_cut::MinimumMultiwayCut;
 pub use minimum_sum_multicenter::MinimumSumMulticenter;
 pub use minimum_vertex_cover::MinimumVertexCover;
 pub use multiple_choice_branching::MultipleChoiceBranching;
@@ -104,6 +107,7 @@ pub(crate) fn canonical_model_example_specs() -> Vec<crate::example_db::specs::M
     specs.extend(maximum_clique::canonical_model_example_specs());
     specs.extend(maximal_is::canonical_model_example_specs());
     specs.extend(minimum_feedback_vertex_set::canonical_model_example_specs());
+    specs.extend(minimum_multiway_cut::canonical_model_example_specs());
     specs.extend(minimum_sum_multicenter::canonical_model_example_specs());
     specs.extend(multiple_choice_branching::canonical_model_example_specs());
     specs.extend(spin_glass::canonical_model_example_specs());

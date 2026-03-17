@@ -9,8 +9,8 @@ use anyhow::{bail, Context, Result};
 use problemreductions::export::{ModelExample, ProblemRef, ProblemSide, RuleExample};
 use problemreductions::models::algebraic::{ClosestVectorProblem, BMF};
 use problemreductions::models::graph::{
-    GraphPartitioning, HamiltonianPath, LengthBoundedDisjointPaths, MultipleChoiceBranching,
-    SteinerTree,
+    GraphPartitioning, HamiltonianPath, LengthBoundedDisjointPaths, MinimumMultiwayCut,
+    MultipleChoiceBranching, SteinerTree,
 };
 use problemreductions::models::misc::{
     BinPacking, FlowShopScheduling, LongestCommonSubsequence, MinimumTardinessSequencing,
@@ -223,6 +223,7 @@ fn type_format_hint(type_name: &str, graph_type: Option<&str>) -> &'static str {
         },
         "Vec<u64>" => "comma-separated integers: 1,1,2",
         "Vec<W>" => "comma-separated: 1,2,3",
+        "Vec<usize>" => "comma-separated indices: 0,2,4",
         "Vec<(usize, usize, W)>" | "Vec<(usize,usize,W)>" => {
             "comma-separated weighted edges: 0-2:3,1-3:5"
         }
@@ -279,6 +280,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         }
         "PartitionIntoTriangles" => "--graph 0-1,1-2,0-2",
         "Factoring" => "--target 15 --m 4 --n 4",
+        "MinimumMultiwayCut" => "--graph 0-1,1-2,2-3 --terminals 0,2 --edge-weights 1,1,1",
         "SequencingWithinIntervals" => "--release-times 0,0,5 --deadlines 11,11,6 --lengths 3,1,1",
         "SteinerTree" => "--graph 0-1,1-2,1-3,3-4 --edge-weights 2,2,1,1 --terminals 0,2,4",
         "OptimalLinearArrangement" => "--graph 0-1,1-2,2-3 --bound 5",
@@ -1181,6 +1183,21 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             )
         }
 
+        // MinimumMultiwayCut
+        "MinimumMultiwayCut" => {
+            let (graph, _) = parse_graph(args).map_err(|e| {
+                anyhow::anyhow!(
+                    "{e}\n\nUsage: pred create MinimumMultiwayCut --graph 0-1,1-2,2-3 --terminals 0,2 [--edge-weights 1,1,1]"
+                )
+            })?;
+            let terminals = parse_terminals(args, graph.num_vertices())?;
+            let edge_weights = parse_edge_weights(args, graph.num_edges())?;
+            (
+                ser(MinimumMultiwayCut::new(graph, terminals, edge_weights))?,
+                resolved_variant.clone(),
+            )
+        }
+
         // MinimumTardinessSequencing
         "MinimumTardinessSequencing" => {
             let deadlines_str = args.deadlines.as_deref().ok_or_else(|| {
@@ -1794,7 +1811,7 @@ fn parse_terminals(args: &CreateArgs, num_vertices: usize) -> Result<Vec<usize>>
     let s = args
         .terminals
         .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("SteinerTree requires --terminals (e.g., \"0,2,4\")"))?;
+        .ok_or_else(|| anyhow::anyhow!("--terminals required (e.g., \"0,2,4\")"))?;
     let terminals: Vec<usize> = s
         .split(',')
         .map(|t| t.trim().parse::<usize>())
@@ -2514,8 +2531,8 @@ fn create_random(
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::problem_help_flag_name;
+    use super::*;
 
     #[test]
     fn test_problem_help_uses_bound_for_length_bounded_disjoint_paths() {
@@ -2537,7 +2554,6 @@ mod tests {
             "num-paths-required"
         );
     }
-
 
     fn empty_args() -> CreateArgs {
         CreateArgs {
