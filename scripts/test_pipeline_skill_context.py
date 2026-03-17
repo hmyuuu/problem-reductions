@@ -226,13 +226,6 @@ class PipelineSkillContextTests(unittest.TestCase):
                 "whitelist": {"ok": True, "skipped": False},
                 "completeness": {"ok": False, "skipped": False, "missing": ["paper_display_name"]},
             },
-            "current_pr": {
-                "repo": "CodingThrust/problem-reductions",
-                "pr_number": 615,
-                "title": "Fix #117: [Model] GraphPartitioning",
-                "linked_issue_number": 117,
-                "issue_context_text": "# Add GraphPartitioning\n\nNeed canonical example.",
-            },
         }
 
         stdout = io.StringIO()
@@ -244,11 +237,9 @@ class PipelineSkillContextTests(unittest.TestCase):
         self.assertIn("- Base SHA: `abc123`", rendered)
         self.assertIn("- Review type: model", rendered)
         self.assertIn("- Name: GraphPartitioning", rendered)
-        self.assertIn("- PR: #615", rendered)
-        self.assertIn("- Linked issue: #117", rendered)
+        self.assertNotIn("## Current PR", rendered)
         self.assertIn("## Deterministic Checks", rendered)
         self.assertIn("- Completeness: fail", rendered)
-        self.assertIn("## Linked Issue Context", rendered)
 
     def test_emit_result_prints_project_pipeline_text_report(self) -> None:
         result = {
@@ -405,7 +396,6 @@ class PipelineSkillContextTests(unittest.TestCase):
             "status": "ready",
             "git": {"base_sha": "abc123", "head_sha": "def456"},
             "review_context": {"subject": {"kind": "generic"}},
-            "current_pr": None,
         }
 
         with mock.patch.object(
@@ -832,7 +822,6 @@ class PipelineSkillContextTests(unittest.TestCase):
                 "src/unit_tests/lib.rs",
             ],
             added_files_getter=lambda repo_root, base_sha, head_sha: [],
-            current_pr_fetcher=lambda: None,
             review_context_builder=lambda repo_root, **kwargs: {
                 "scope": {"review_type": "generic", "models": [], "rules": [], "changed_files": kwargs["changed_files"]},
                 "subject": {"kind": "generic"},
@@ -846,7 +835,7 @@ class PipelineSkillContextTests(unittest.TestCase):
         self.assertEqual(result["skill"], "review-implementation")
         self.assertEqual(result["status"], "ready")
         self.assertEqual(result["git"]["base_sha"], "abc123")
-        self.assertEqual(result["current_pr"], None)
+        self.assertNotIn("current_pr", result)
         self.assertEqual(result["review_context"]["subject"]["kind"], "generic")
 
     def test_build_project_pipeline_context_reports_requested_blocked_issue(self) -> None:
