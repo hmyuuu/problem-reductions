@@ -47,7 +47,9 @@ REPO=$(gh repo view --json nameWithOwner --jq .nameWithOwner)
 QUEUE=$(python3 scripts/pipeline_board.py list review --repo "$REPO" --format json)
 ```
 
-If `PR` was explicitly supplied (for example `/review-pipeline 570`), do **not** pick a different item from the queue. Triage only that PR.
+If `PR` was explicitly supplied (for example `/review-pipeline 570`), do **not** pick a different item from the queue. Find that PR in the `QUEUE` JSON output to get its `ITEM_ID` and confirm it is in Review pool.
+
+`pipeline_board.py` only supports these subcommands: `next`, `claim-next`, `ack`, `list`, `move`, `backlog`. To look up a specific PR's board status, use `list` and filter the JSON output.
 
 Pick one candidate with a lightweight heuristic:
 - prefer direct PR cards over issue cards
@@ -255,3 +257,4 @@ python3 scripts/pipeline_worktree.py cleanup --worktree "$WORKTREE_DIR"
 | Pasting raw agent transcripts | Paste the structured report sections only — checklist tables, issue lists, test results — not internal reasoning or scratch work |
 | Regenerating context in subagents | Pass `IMPL_REPORT` to structural/quality subagents so they skip `pipeline_skill_context.py review-implementation` |
 | Always picking the same PR on retry | Use randomized tie-breaking when multiple candidates are eligible |
+| Inventing `pipeline_board.py` subcommands | Only `next`, `claim-next`, `ack`, `list`, `move`, `backlog` exist. Use `list` to look up a PR's board status |

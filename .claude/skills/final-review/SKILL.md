@@ -9,8 +9,14 @@ Interactive review with the maintainer for PRs in the `Final review` column on t
 
 **Rules:**
 - Every `AskUserQuestion` must include your recommendation (e.g., "My recommendation: **Merge** — clean implementation with full coverage").
-- Never just flag an issue — always describe the context (assume the reviewer hasn't seen the code), propose a concrete fix, and let the reviewer decide what to do.
 - **Skip questions when no issues found.** If a check (usefulness, safety, completeness) finds no concerns, report the positive result and continue to the next step without asking the reviewer. Only use `AskUserQuestion` when there are findings that need the reviewer's input or when the recommendation is not clearly positive.
+- **Issue presentation format** — whenever reporting an issue (in any step), use this format:
+  > **N. [Short title]** (`file:line`)
+  > ```rust
+  > // 5-15 lines showing the problem
+  > ```
+  > - **Why**: What's wrong and why it matters — assume the reviewer hasn't seen the code
+  > - **Suggested fix**: Concrete action or code sketch
 
 ## Invocation
 
@@ -111,9 +117,7 @@ Prepare a short summary:
 >
 > [N findings reviewed: X addressed, Y still open, Z false positive]
 >
-> Still open:
-> - [finding summary]
-> - ...
+> Still open: [list each using the issue presentation format]
 
 If no agentic review report exists (or the report is poorly structured / missing key sections), note this to the reviewer and perform the checks in Steps 2–5 yourself from scratch — read the full diff, verify correctness, check completeness, and assess quality as if no prior review had been done.
 
@@ -265,21 +269,11 @@ Present to reviewer:
 > Strengths:
 > - [bullet points]
 >
-> Issues (numbered):
->
-> **1. [Short title]** (`file:line`)
-> - **Context**: What the issue is, where it occurs, and why it matters (the reviewer should understand the problem without reading the code first)
-> - **Suggested fix**: Concrete steps or code sketch to resolve it
-> - **Pros/cons**: Tradeoffs of fixing now vs deferring (e.g., "Quick fix, low risk" or "Requires API redesign, better as follow-up")
+> Issues: [list each using the issue presentation format, plus for each:]
+> - **Pros/cons**: Tradeoffs of fixing now vs deferring
 > - **Recommendation**: Quick fix / Record for follow-up / Informational only
 >
-> **2. [Short title]** (`file:line`)
-> - **Context**: ...
-> - **Suggested fix**: ...
-> - **Pros/cons**: ...
-> - **Recommendation**: ...
->
-> Notable observations: [optional — anything else that caught your attention during the review: unusual design choices, clever techniques worth reusing elsewhere, potential impact on the reduction graph, or patterns that diverge from the rest of the codebase. Omit if nothing stands out.]
+> Notable observations: [optional — unusual design choices, clever techniques, or patterns that diverge from the codebase. Omit if nothing stands out.]
 
 ### Step 6: Confirm issues and fix plan
 
@@ -298,11 +292,7 @@ Then list all issues found (from Steps 1b–5) with the fix plan for each. Use `
 
 > **Issues found and proposed fixes:**
 >
-> 1. [issue title] — [fix plan summary]
-> 2. [issue title] — [fix plan summary]
-> ...
->
-> (If no issues: "No issues found.")
+> [List each using the issue presentation format. If no issues: "No issues found."]
 >
 > **Should I proceed with these fixes?**
 > - "Yes" — apply all fixes, commit (do not push yet)
@@ -376,3 +366,15 @@ Use `AskUserQuestion`:
    cd "$REPO_ROOT"
    python3 scripts/pipeline_worktree.py cleanup --worktree "$WORKTREE_DIR"
    ```
+
+## Pipeline Script Subcommands
+
+Only use subcommands that exist. Available subcommands per script:
+
+| Script | Subcommands |
+|--------|-------------|
+| `pipeline_board.py` | `next`, `claim-next`, `ack`, `list`, `move`, `backlog` |
+| `pipeline_pr.py` | `context`, `current`, `snapshot`, `comments`, `ci`, `wait-ci`, `codecov`, `linked-issue`, `create`, `comment`, `edit-body` |
+| `pipeline_worktree.py` | `enter`, `create-issue`, `prepare-issue-branch`, `checkout-pr`, `prepare-review`, `merge-main`, `cleanup` |
+| `pipeline_skill_context.py` | `review-pipeline`, `final-review`, `review-implementation`, `project-pipeline` |
+| `pipeline_checks.py` | `detect-scope`, `file-whitelist`, `completeness`, `review-context`, `issue-guards`, `issue-context` |
