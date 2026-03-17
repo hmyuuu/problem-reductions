@@ -234,6 +234,7 @@ Flags by problem type:
   PaintShop                       --sequence
   MaximumSetPacking               --sets [--weights]
   MinimumSetCovering              --universe, --sets [--weights]
+  ComparativeContainment          --universe, --r-sets, --s-sets [--r-weights] [--s-weights]
   X3C (ExactCoverBy3Sets)         --universe, --sets (3 elements each)
   SetBasis                        --universe, --sets, --k
   BicliqueCover                   --left, --right, --biedges, --k
@@ -389,10 +390,22 @@ pub struct CreateArgs {
     /// Sets for SetPacking/SetCovering (semicolon-separated, e.g., "0,1;1,2;0,2")
     #[arg(long)]
     pub sets: Option<String>,
+    /// R-family sets for ComparativeContainment (semicolon-separated, e.g., "0,1;1,2")
+    #[arg(long)]
+    pub r_sets: Option<String>,
+    /// S-family sets for ComparativeContainment (semicolon-separated, e.g., "0,1;1,2")
+    #[arg(long)]
+    pub s_sets: Option<String>,
+    /// R-family weights for ComparativeContainment (comma-separated, e.g., "2,5")
+    #[arg(long)]
+    pub r_weights: Option<String>,
+    /// S-family weights for ComparativeContainment (comma-separated, e.g., "3,6")
+    #[arg(long)]
+    pub s_weights: Option<String>,
     /// Partition groups for arc-index partitions (semicolon-separated, e.g., "0,1;2,3")
     #[arg(long)]
     pub partition: Option<String>,
-    /// Universe size for MinimumSetCovering
+    /// Universe size for set-system problems such as MinimumSetCovering and ComparativeContainment
     #[arg(long)]
     pub universe: Option<usize>,
     /// Bipartite graph edges for BicliqueCover / BalancedCompleteBipartiteSubgraph (e.g., "0-0,0-1,1-2" for left-right pairs)

@@ -63,7 +63,7 @@ pub mod prelude {
         ShortestCommonSupersequence, SubsetSum,
     };
     pub use crate::models::set::{
-        ExactCoverBy3Sets, MaximumSetPacking, MinimumSetCovering, SetBasis,
+        ComparativeContainment, ExactCoverBy3Sets, MaximumSetPacking, MinimumSetCovering, SetBasis,
     };
 
     // Core traits

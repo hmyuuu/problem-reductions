@@ -59,6 +59,10 @@ fn all_data_flags_empty(args: &CreateArgs) -> bool {
         && args.capacity.is_none()
         && args.sequence.is_none()
         && args.sets.is_none()
+        && args.r_sets.is_none()
+        && args.s_sets.is_none()
+        && args.r_weights.is_none()
+        && args.s_weights.is_none()
         && args.partition.is_none()
         && args.universe.is_none()
         && args.biedges.is_none()
@@ -222,15 +226,15 @@ fn type_format_hint(type_name: &str, graph_type: Option<&str>) -> &'static str {
             Some("UnitDiskGraph") => "float positions: \"0.0,0.0;1.0,0.0\"",
             _ => "edge list: 0-1,1-2,2-3",
         },
-        "Vec<u64>" => "comma-separated integers: 1,1,2",
+        "Vec<u64>" => "comma-separated integers: 1,2,3",
         "Vec<W>" => "comma-separated: 1,2,3",
         "Vec<usize>" => "comma-separated indices: 0,2,4",
         "Vec<(usize, usize, W)>" | "Vec<(usize,usize,W)>" => {
             "comma-separated weighted edges: 0-2:3,1-3:5"
         }
+        "Vec<Vec<usize>>" => "semicolon-separated sets: \"0,1;1,2;0,2\"",
         "Vec<CNFClause>" => "semicolon-separated clauses: \"1,2;-1,3\"",
         "Vec<Vec<W>>" => "semicolon-separated rows: \"1,0.5;0.5,2\"",
-        "Vec<Vec<usize>>" => "semicolon-separated groups: \"0,1;2,3\"",
         "usize" | "W::Sum" => "integer",
         "u64" => "integer",
         "i64" => "integer",
@@ -303,6 +307,9 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         }
         "SubgraphIsomorphism" => "--graph 0-1,1-2,2-0 --pattern 0-1",
         "SubsetSum" => "--sizes 3,7,1,8,2,4 --target 11",
+        "ComparativeContainment" => {
+            "--universe 4 --r-sets \"0,1,2,3;0,1\" --s-sets \"0,1,2,3;2,3\" --r-weights 2,5 --s-weights 3,6"
+        }
         "SetBasis" => "--universe 4 --sets \"0,1;1,2;0,2;0,1,2\" --k 3",
         "ShortestCommonSupersequence" => "--strings \"0,1,2;1,2,0\" --bound 4",
         _ => "",
@@ -341,6 +348,7 @@ fn help_flag_hint(
 ) -> &'static str {
     match (canonical, field_name) {
         ("BoundedComponentSpanningForest", "max_weight") => "integer",
+        ("MultipleChoiceBranching", "partition") => "semicolon-separated groups: \"0,1;2,3\"",
         _ => type_format_hint(type_name, graph_type),
     }
 }
@@ -1035,6 +1043,80 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
                 ser(MinimumSetCovering::with_weights(universe, sets, weights))?,
                 resolved_variant.clone(),
             )
+        }
+
+        // ComparativeContainment
+        "ComparativeContainment" => {
+            let universe = args.universe.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "ComparativeContainment requires --universe, --r-sets, and --s-sets\n\n\
+                     Usage: pred create ComparativeContainment --universe 4 --r-sets \"0,1,2,3;0,1\" --s-sets \"0,1,2,3;2,3\" [--r-weights 2,5] [--s-weights 3,6]"
+                )
+            })?;
+            let r_sets = parse_named_sets(args.r_sets.as_deref(), "--r-sets")?;
+            let s_sets = parse_named_sets(args.s_sets.as_deref(), "--s-sets")?;
+            validate_comparative_containment_sets("R", "--r-sets", universe, &r_sets)?;
+            validate_comparative_containment_sets("S", "--s-sets", universe, &s_sets)?;
+            let data = match resolved_variant.get("weight").map(|value| value.as_str()) {
+                Some("One") => {
+                    let r_weights = parse_named_set_weights(
+                        args.r_weights.as_deref(),
+                        r_sets.len(),
+                        "--r-weights",
+                    )?;
+                    let s_weights = parse_named_set_weights(
+                        args.s_weights.as_deref(),
+                        s_sets.len(),
+                        "--s-weights",
+                    )?;
+                    if r_weights.iter().any(|&w| w != 1) || s_weights.iter().any(|&w| w != 1) {
+                        bail!(
+                            "Non-unit weights are not supported for ComparativeContainment/One.\n\n\
+                             Use `pred create ComparativeContainment/i32 ... --r-weights ... --s-weights ...` for weighted instances."
+                        );
+                    }
+                    ser(ComparativeContainment::<One>::new(universe, r_sets, s_sets))?
+                }
+                Some("f64") => {
+                    let r_weights = parse_named_set_weights_f64(
+                        args.r_weights.as_deref(),
+                        r_sets.len(),
+                        "--r-weights",
+                    )?;
+                    validate_comparative_containment_f64_weights("R", "--r-weights", &r_weights)?;
+                    let s_weights = parse_named_set_weights_f64(
+                        args.s_weights.as_deref(),
+                        s_sets.len(),
+                        "--s-weights",
+                    )?;
+                    validate_comparative_containment_f64_weights("S", "--s-weights", &s_weights)?;
+                    ser(ComparativeContainment::<f64>::with_weights(
+                        universe, r_sets, s_sets, r_weights, s_weights,
+                    ))?
+                }
+                Some("i32") | None => {
+                    let r_weights = parse_named_set_weights(
+                        args.r_weights.as_deref(),
+                        r_sets.len(),
+                        "--r-weights",
+                    )?;
+                    validate_comparative_containment_i32_weights("R", "--r-weights", &r_weights)?;
+                    let s_weights = parse_named_set_weights(
+                        args.s_weights.as_deref(),
+                        s_sets.len(),
+                        "--s-weights",
+                    )?;
+                    validate_comparative_containment_i32_weights("S", "--s-weights", &s_weights)?;
+                    ser(ComparativeContainment::with_weights(
+                        universe, r_sets, s_sets, r_weights, s_weights,
+                    ))?
+                }
+                Some(other) => bail!(
+                    "Unsupported ComparativeContainment weight variant: {}",
+                    other
+                ),
+            };
+            (data, resolved_variant.clone())
         }
 
         // ExactCoverBy3Sets
@@ -2092,10 +2174,12 @@ fn parse_clauses(args: &CreateArgs) -> Result<Vec<CNFClause>> {
 /// Parse `--sets` as semicolon-separated sets of comma-separated usize.
 /// E.g., "0,1;1,2;0,2"
 fn parse_sets(args: &CreateArgs) -> Result<Vec<Vec<usize>>> {
-    let sets_str = args
-        .sets
-        .as_deref()
-        .ok_or_else(|| anyhow::anyhow!("This problem requires --sets (e.g., \"0,1;1,2;0,2\")"))?;
+    parse_named_sets(args.sets.as_deref(), "--sets")
+}
+
+fn parse_named_sets(sets_str: Option<&str>, flag: &str) -> Result<Vec<Vec<usize>>> {
+    let sets_str = sets_str
+        .ok_or_else(|| anyhow::anyhow!("This problem requires {flag} (e.g., \"0,1;1,2;0,2\")"))?;
     sets_str
         .split(';')
         .map(|set| {
@@ -2109,6 +2193,23 @@ fn parse_sets(args: &CreateArgs) -> Result<Vec<Vec<usize>>> {
                 .collect()
         })
         .collect()
+}
+
+fn validate_comparative_containment_sets(
+    family_name: &str,
+    flag: &str,
+    universe_size: usize,
+    sets: &[Vec<usize>],
+) -> Result<()> {
+    for (set_index, set) in sets.iter().enumerate() {
+        for &element in set {
+            anyhow::ensure!(
+                element < universe_size,
+                "{family_name} set {set_index} from {flag} contains element {element} outside universe of size {universe_size}"
+            );
+        }
+    }
+    Ok(())
 }
 
 /// Parse `--partition` as semicolon-separated groups of comma-separated arc indices.
@@ -2175,16 +2276,79 @@ fn parse_multiple_choice_branching_threshold(args: &CreateArgs, usage: &str) -> 
 
 /// Parse `--weights` for set-based problems (i32), defaulting to all 1s.
 fn parse_set_weights(args: &CreateArgs, num_sets: usize) -> Result<Vec<i32>> {
-    match &args.weights {
+    parse_named_set_weights(args.weights.as_deref(), num_sets, "--weights")
+}
+
+fn parse_named_set_weights(
+    weights_str: Option<&str>,
+    num_sets: usize,
+    flag: &str,
+) -> Result<Vec<i32>> {
+    match weights_str {
         Some(w) => {
             let weights: Vec<i32> = util::parse_comma_list(w)?;
             if weights.len() != num_sets {
-                bail!("Expected {} weights but got {}", num_sets, weights.len());
+                bail!(
+                    "Expected {} values for {} but got {}",
+                    num_sets,
+                    flag,
+                    weights.len()
+                );
             }
             Ok(weights)
         }
         None => Ok(vec![1i32; num_sets]),
     }
+}
+
+fn parse_named_set_weights_f64(
+    weights_str: Option<&str>,
+    num_sets: usize,
+    flag: &str,
+) -> Result<Vec<f64>> {
+    match weights_str {
+        Some(w) => {
+            let weights: Vec<f64> = util::parse_comma_list(w)?;
+            if weights.len() != num_sets {
+                bail!(
+                    "Expected {} values for {} but got {}",
+                    num_sets,
+                    flag,
+                    weights.len()
+                );
+            }
+            Ok(weights)
+        }
+        None => Ok(vec![1.0f64; num_sets]),
+    }
+}
+
+fn validate_comparative_containment_i32_weights(
+    family_name: &str,
+    flag: &str,
+    weights: &[i32],
+) -> Result<()> {
+    for (index, weight) in weights.iter().enumerate() {
+        anyhow::ensure!(
+            *weight > 0,
+            "{family_name} weights from {flag} must be positive; found {weight} at index {index}"
+        );
+    }
+    Ok(())
+}
+
+fn validate_comparative_containment_f64_weights(
+    family_name: &str,
+    flag: &str,
+    weights: &[f64],
+) -> Result<()> {
+    for (index, weight) in weights.iter().enumerate() {
+        anyhow::ensure!(
+            weight.is_finite() && *weight > 0.0,
+            "{family_name} weights from {flag} must be finite and positive; found {weight} at index {index}"
+        );
+    }
+    Ok(())
 }
 
 /// Parse `--matrix` as semicolon-separated rows of comma-separated bool values (0/1).
@@ -2728,6 +2892,10 @@ mod tests {
             capacity: None,
             sequence: None,
             sets: None,
+            r_sets: None,
+            s_sets: None,
+            r_weights: None,
+            s_weights: None,
             partition: None,
             universe: None,
             biedges: None,
