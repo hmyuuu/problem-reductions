@@ -604,7 +604,7 @@ mod tests {
             panic!("expected create command");
         };
 
-        assert_eq!(args.problem, "BiconnectivityAugmentation");
+        assert_eq!(args.problem.as_deref(), Some("BiconnectivityAugmentation"));
         assert_eq!(args.graph.as_deref(), Some("0-1,1-2"));
         assert_eq!(args.potential_edges.as_deref(), Some("0-2:3,1-3:5"));
         assert_eq!(args.budget.as_deref(), Some("7"));
