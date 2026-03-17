@@ -231,7 +231,6 @@ fn type_format_hint(type_name: &str, graph_type: Option<&str>) -> &'static str {
         "Vec<Vec<usize>>" => "semicolon-separated groups: \"0,1;2,3\"",
         "usize" | "W::Sum" => "integer",
         "u64" => "integer",
-        "Vec<u64>" => "comma-separated integers: 0,0,5",
         "i64" => "integer",
         "BigUint" => "nonnegative decimal integer",
         "Vec<BigUint>" => "comma-separated nonnegative decimal integers: 3,7,1,8",
@@ -2515,6 +2514,7 @@ fn create_random(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use super::problem_help_flag_name;
 
     #[test]
@@ -2537,18 +2537,21 @@ mod tests {
             "num-paths-required"
         );
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
 
     fn empty_args() -> CreateArgs {
         CreateArgs {
-            problem: "BiconnectivityAugmentation".to_string(),
+            problem: Some("BiconnectivityAugmentation".to_string()),
+            example: None,
+            example_target: None,
+            example_side: crate::cli::ExampleSide::Source,
             graph: None,
             weights: None,
             edge_weights: None,
+            capacities: None,
+            source: None,
+            sink: None,
+            num_paths_required: None,
             couplings: None,
             fields: None,
             clauses: None,
@@ -2564,10 +2567,17 @@ mod tests {
             n: None,
             positions: None,
             radius: None,
+            source_1: None,
+            sink_1: None,
+            source_2: None,
+            sink_2: None,
+            requirement_1: None,
+            requirement_2: None,
             sizes: None,
             capacity: None,
             sequence: None,
             sets: None,
+            partition: None,
             universe: None,
             biedges: None,
             left: None,
@@ -2576,10 +2586,23 @@ mod tests {
             basis: None,
             target_vec: None,
             bounds: None,
+            release_times: None,
+            lengths: None,
+            terminals: None,
+            tree: None,
+            required_edges: None,
+            bound: None,
+            pattern: None,
             strings: None,
             arcs: None,
             potential_edges: None,
             budget: None,
+            deadlines: None,
+            precedence_pairs: None,
+            task_lengths: None,
+            deadline: None,
+            num_processors: None,
+            alphabet_size: None,
         }
     }
 
