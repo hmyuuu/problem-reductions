@@ -30,6 +30,7 @@
 //! - [`SubgraphIsomorphism`]: Subgraph isomorphism (decision problem)
 //! - [`DirectedTwoCommodityIntegralFlow`]: Directed two-commodity integral flow (satisfaction)
 //! - [`UndirectedTwoCommodityIntegralFlow`]: Two-commodity integral flow on undirected graphs
+//! - [`StrongConnectivityAugmentation`]: Strong connectivity augmentation with weighted candidate arcs
 
 pub(crate) mod biclique_cover;
 pub(crate) mod biconnectivity_augmentation;
@@ -57,6 +58,7 @@ pub(crate) mod partition_into_triangles;
 pub(crate) mod rural_postman;
 pub(crate) mod spin_glass;
 pub(crate) mod steiner_tree;
+pub(crate) mod strong_connectivity_augmentation;
 pub(crate) mod subgraph_isomorphism;
 pub(crate) mod traveling_salesman;
 pub(crate) mod undirected_two_commodity_integral_flow;
@@ -87,6 +89,7 @@ pub use partition_into_triangles::PartitionIntoTriangles;
 pub use rural_postman::RuralPostman;
 pub use spin_glass::SpinGlass;
 pub use steiner_tree::SteinerTree;
+pub use strong_connectivity_augmentation::StrongConnectivityAugmentation;
 pub use subgraph_isomorphism::SubgraphIsomorphism;
 pub use traveling_salesman::TravelingSalesman;
 pub use undirected_two_commodity_integral_flow::UndirectedTwoCommodityIntegralFlow;
@@ -118,5 +121,6 @@ pub(crate) fn canonical_model_example_specs() -> Vec<crate::example_db::specs::M
     specs.extend(steiner_tree::canonical_model_example_specs());
     specs.extend(directed_two_commodity_integral_flow::canonical_model_example_specs());
     specs.extend(undirected_two_commodity_integral_flow::canonical_model_example_specs());
+    specs.extend(strong_connectivity_augmentation::canonical_model_example_specs());
     specs
 }

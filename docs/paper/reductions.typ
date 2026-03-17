@@ -108,6 +108,7 @@
   "ShortestCommonSupersequence": [Shortest Common Supersequence],
   "MinimumSumMulticenter": [Minimum Sum Multicenter],
   "SteinerTree": [Steiner Tree],
+  "StrongConnectivityAugmentation": [Strong Connectivity Augmentation],
   "SubgraphIsomorphism": [Subgraph Isomorphism],
   "PartitionIntoTriangles": [Partition Into Triangles],
   "FlowShopScheduling": [Flow Shop Scheduling],
@@ -1067,6 +1068,49 @@ is feasible: each set induces a connected subgraph, the component weights are $2
     },
     caption: [Steiner tree on #nv vertices with terminals $T = {#terminals.map(t => $v_#t$).join(", ")}$ (filled blue). Steiner vertices #steiner-verts.map(v => $v_#v$).join(", ") (outlined) relay connections. Blue edges form the optimal tree with cost #cost.],
     ) <fig:steiner-tree>
+    ]
+  ]
+}
+#{
+  let x = load-model-example("StrongConnectivityAugmentation")
+  let nv = x.instance.graph.inner.nodes.len()
+  let ne = x.instance.graph.inner.edges.len()
+  let arcs = x.instance.graph.inner.edges.map(e => (e.at(0), e.at(1)))
+  let candidates = x.instance.candidate_arcs
+  let bound = x.instance.bound
+  let sol = x.optimal.at(0)
+  let chosen = candidates.enumerate().filter(((i, _)) => sol.config.at(i) == 1).map(((i, arc)) => arc)
+  let arc = chosen.at(0)
+  let blue = graph-colors.at(0)
+  [
+    #problem-def("StrongConnectivityAugmentation")[
+      Given a directed graph $G = (V, A)$, a set $C subset.eq (V times V backslash A) times ZZ_(> 0)$ of weighted candidate arcs, and a bound $B in ZZ_(>= 0)$, determine whether there exists a subset $C' subset.eq C$ such that $sum_((u, v, w) in C') w <= B$ and the augmented digraph $(V, A union {(u, v) : (u, v, w) in C'})$ is strongly connected.
+    ][
+    Strong Connectivity Augmentation models network design problems where a partially connected directed communication graph may be repaired by buying additional arcs. Eswaran and Tarjan showed that the unweighted augmentation problem is solvable in linear time, while the weighted variant is substantially harder @eswarantarjan1976. The decision version recorded as ND19 in Garey and Johnson is NP-complete @garey1979. The implementation here uses one binary variable per candidate arc, so brute-force over the candidate set yields a worst-case bound of $O^*(2^m)$ where $m = "num_potential_arcs"$. #footnote[No exact algorithm improving on brute-force is claimed here for the weighted candidate-arc formulation implemented in the codebase.]
+
+    *Example.* The canonical instance has $n = #nv$ vertices, $|A| = #ne$ existing arcs, #candidates.len() weighted candidate arcs, and bound $B = #bound$. The base graph already contains the directed 3-cycle $v_0 -> v_1 -> v_2 -> v_0$ and the strongly connected component on ${v_3, v_4, v_5}$, with only the forward bridge $v_2 -> v_3$ between them. The unique satisfying augmentation under this bound selects the single candidate arc $(v_#arc.at(0), v_#arc.at(1)))$ of weight #arc.at(2), closing the cycle $v_2 -> v_3 -> v_4 -> v_5 -> v_2$ and making every vertex reachable from every other. The all-zero configuration is infeasible because no path returns from ${v_3, v_4, v_5}$ to ${v_0, v_1, v_2}$.
+
+    #figure({
+      let verts = ((0, 1), (1.2, 1.6), (1.2, 0.4), (3.4, 1.0), (4.6, 1.5), (4.6, 0.5))
+      canvas(length: 1cm, {
+        for (u, v) in arcs {
+          draw.line(verts.at(u), verts.at(v),
+            stroke: 1pt + black,
+            mark: (end: "straight", scale: 0.4))
+        }
+        draw.line(verts.at(arc.at(0)), verts.at(arc.at(1)),
+          stroke: 1.6pt + blue,
+          mark: (end: "straight", scale: 0.45))
+        for (k, pos) in verts.enumerate() {
+          let highlighted = k == arc.at(0) or k == arc.at(1)
+          g-node(pos, name: "v" + str(k),
+            fill: if highlighted { blue.transparentize(65%) } else { white },
+            label: [$v_#k$])
+        }
+      })
+    },
+    caption: [Strong Connectivity Augmentation on a #{nv}-vertex digraph. Black arcs are present in $A$; the added candidate arc $(v_#arc.at(0), v_#arc.at(1)))$ is shown in blue. With bound $B = #bound$, this single augmentation makes the digraph strongly connected.],
+    ) <fig:strong-connectivity-augmentation>
     ]
   ]
 }

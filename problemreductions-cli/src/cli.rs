@@ -249,6 +249,7 @@ Flags by problem type:
   LCS                             --strings
   FAS                             --arcs [--weights] [--num-vertices]
   FVS                             --arcs [--weights] [--num-vertices]
+  StrongConnectivityAugmentation  --arcs, --candidate-arcs, --bound [--num-vertices]
   FlowShopScheduling              --task-lengths, --deadline [--num-processors]
   MinimumTardinessSequencing      --n, --deadlines [--precedence-pairs]
   SCS                             --strings, --bound [--alphabet-size]
@@ -447,6 +448,9 @@ pub struct CreateArgs {
     /// Total budget for selected potential edges
     #[arg(long)]
     pub budget: Option<String>,
+    /// Candidate weighted arcs for StrongConnectivityAugmentation (e.g., 2>0:1,2>1:3)
+    #[arg(long)]
+    pub candidate_arcs: Option<String>,
     /// Deadlines for MinimumTardinessSequencing (comma-separated, e.g., "5,5,5,3,3")
     #[arg(long)]
     pub deadlines: Option<String>,

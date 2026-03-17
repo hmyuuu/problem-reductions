@@ -10,7 +10,7 @@ use problemreductions::export::{ModelExample, ProblemRef, ProblemSide, RuleExamp
 use problemreductions::models::algebraic::{ClosestVectorProblem, BMF};
 use problemreductions::models::graph::{
     GraphPartitioning, HamiltonianPath, LengthBoundedDisjointPaths, MinimumMultiwayCut,
-    MultipleChoiceBranching, SteinerTree,
+    MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
 };
 use problemreductions::models::misc::{
     BinPacking, FlowShopScheduling, LongestCommonSubsequence, MinimumTardinessSequencing,
@@ -78,6 +78,7 @@ fn all_data_flags_empty(args: &CreateArgs) -> bool {
         && args.pattern.is_none()
         && args.strings.is_none()
         && args.arcs.is_none()
+        && args.candidate_arcs.is_none()
         && args.potential_edges.is_none()
         && args.budget.is_none()
         && args.precedence_pairs.is_none()
@@ -288,6 +289,9 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
             "--arcs \"0>2,0>3,1>2,1>3,2>4,2>5,3>4,3>5\" --capacities 1,1,1,1,1,1,1,1 --source-1 0 --sink-1 4 --source-2 1 --sink-2 5 --requirement-1 1 --requirement-2 1"
         }
         "MinimumFeedbackArcSet" => "--arcs \"0>1,1>2,2>0\"",
+        "StrongConnectivityAugmentation" => {
+            "--arcs \"0>1,1>2\" --candidate-arcs \"2>0:1\" --bound 1"
+        }
         "RuralPostman" => {
             "--graph 0-1,1-2,2-3,3-0 --edge-weights 1,1,1,1 --required-edges 0,2 --bound 4"
         }
@@ -1422,6 +1426,32 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             )
         }
 
+        // StrongConnectivityAugmentation
+        "StrongConnectivityAugmentation" => {
+            let usage = "Usage: pred create StrongConnectivityAugmentation --arcs \"0>1,1>2\" --candidate-arcs \"2>0:1\" --bound 1 [--num-vertices N]";
+            let arcs_str = args.arcs.as_deref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "StrongConnectivityAugmentation requires --arcs\n\n\
+                     {usage}"
+                )
+            })?;
+            let (graph, _) = parse_directed_graph(arcs_str, args.num_vertices)?;
+            let candidate_arcs = parse_candidate_arcs(args, graph.num_vertices())?;
+            let bound = args.bound.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "StrongConnectivityAugmentation requires --bound\n\n\
+                     {usage}"
+                )
+            })? as i32;
+            (
+                ser(
+                    StrongConnectivityAugmentation::try_new(graph, candidate_arcs, bound)
+                        .map_err(|e| anyhow::anyhow!(e))?,
+                )?,
+                resolved_variant.clone(),
+            )
+        }
+
         // MinimumSumMulticenter (p-median)
         "MinimumSumMulticenter" => {
             let (graph, n) = parse_graph(args).map_err(|e| {
@@ -2280,6 +2310,51 @@ fn parse_arc_weights(args: &CreateArgs, num_arcs: usize) -> Result<Vec<i32>> {
     }
 }
 
+/// Parse `--candidate-arcs` as `u>v:w` entries for StrongConnectivityAugmentation.
+fn parse_candidate_arcs(
+    args: &CreateArgs,
+    num_vertices: usize,
+) -> Result<Vec<(usize, usize, i32)>> {
+    let arcs_str = args.candidate_arcs.as_deref().ok_or_else(|| {
+        anyhow::anyhow!(
+            "StrongConnectivityAugmentation requires --candidate-arcs (e.g., \"2>0:1,2>1:3\")"
+        )
+    })?;
+
+    arcs_str
+        .split(',')
+        .map(|entry| {
+            let entry = entry.trim();
+            let (arc_part, weight_part) = entry.split_once(':').ok_or_else(|| {
+                anyhow::anyhow!(
+                    "Invalid candidate arc '{}': expected format u>v:w (e.g., 2>0:1)",
+                    entry
+                )
+            })?;
+            let parts: Vec<&str> = arc_part.split('>').collect();
+            if parts.len() != 2 {
+                bail!(
+                    "Invalid candidate arc '{}': expected format u>v:w (e.g., 2>0:1)",
+                    entry
+                );
+            }
+
+            let u: usize = parts[0].parse()?;
+            let v: usize = parts[1].parse()?;
+            anyhow::ensure!(
+                u < num_vertices && v < num_vertices,
+                "candidate arc ({}, {}) references vertex >= num_vertices ({})",
+                u,
+                v,
+                num_vertices
+            );
+
+            let w: i32 = weight_part.parse()?;
+            Ok((u, v, w))
+        })
+        .collect()
+}
+
 /// Handle `pred create <PROBLEM> --random ...`
 fn create_random(
     args: &CreateArgs,
@@ -2613,6 +2688,7 @@ mod tests {
             arcs: None,
             potential_edges: None,
             budget: None,
+            candidate_arcs: None,
             deadlines: None,
             precedence_pairs: None,
             task_lengths: None,
