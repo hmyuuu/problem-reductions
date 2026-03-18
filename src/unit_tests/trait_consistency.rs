@@ -150,6 +150,10 @@ fn test_all_problems_implement_trait_correctly() {
         &SumOfSquaresPartition::new(vec![5, 3, 8, 2, 7, 1], 3, 240),
         "SumOfSquaresPartition",
     );
+    check_problem_trait(
+        &ConsecutiveOnesSubmatrix::new(vec![vec![true, false], vec![false, true]], 1),
+        "ConsecutiveOnesSubmatrix",
+    );
 }
 
 #[test]

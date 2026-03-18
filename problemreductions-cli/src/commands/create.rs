@@ -7,7 +7,7 @@ use crate::problem_name::{
 use crate::util;
 use anyhow::{bail, Context, Result};
 use problemreductions::export::{ModelExample, ProblemRef, ProblemSide, RuleExample};
-use problemreductions::models::algebraic::{ClosestVectorProblem, BMF};
+use problemreductions::models::algebraic::{ClosestVectorProblem, ConsecutiveOnesSubmatrix, BMF};
 use problemreductions::models::graph::{
     GraphPartitioning, HamiltonianCircuit, HamiltonianPath, LengthBoundedDisjointPaths,
     MinimumMultiwayCut, MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
@@ -374,6 +374,7 @@ fn help_flag_name(canonical: &str, field_name: &str) -> String {
         ("PrimeAttributeName", "dependencies") => return "deps".to_string(),
         ("PrimeAttributeName", "query_attribute") => return "query".to_string(),
         ("MinimumCardinalityKey", "bound_k") => return "k".to_string(),
+        ("ConsecutiveOnesSubmatrix", "bound_k") => return "k".to_string(),
         ("StaffScheduling", "shifts_per_schedule") => return "k".to_string(),
         _ => {}
     }
@@ -433,6 +434,7 @@ fn help_flag_hint(
         }
         ("ShortestCommonSupersequence", "strings") => "symbol lists: \"0,1,2;1,2,0\"",
         ("MultipleChoiceBranching", "partition") => "semicolon-separated groups: \"0,1;2,3\"",
+        ("ConsecutiveOnesSubmatrix", "matrix") => "semicolon-separated 0/1 rows: \"1,0;0,1\"",
         _ => type_format_hint(type_name, graph_type),
     }
 }
@@ -1464,6 +1466,21 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
                 )
             })?;
             (ser(BMF::new(matrix, rank))?, resolved_variant.clone())
+        }
+
+        // ConsecutiveOnesSubmatrix
+        "ConsecutiveOnesSubmatrix" => {
+            let matrix = parse_bool_matrix(args)?;
+            let k = args.k.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "ConsecutiveOnesSubmatrix requires --matrix and --k\n\n\
+                     Usage: pred create ConsecutiveOnesSubmatrix --matrix \"1,1,0,1;1,0,1,1;0,1,1,0\" --k 3"
+                )
+            })?;
+            (
+                ser(ConsecutiveOnesSubmatrix::new(matrix, k))?,
+                resolved_variant.clone(),
+            )
         }
 
         // LongestCommonSubsequence

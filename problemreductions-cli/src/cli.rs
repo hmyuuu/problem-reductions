@@ -247,6 +247,7 @@ Flags by problem type:
   BalancedCompleteBipartiteSubgraph --left, --right, --biedges, --k
   BiconnectivityAugmentation      --graph, --potential-edges, --budget [--num-vertices]
   BMF                             --matrix (0/1), --rank
+  ConsecutiveOnesSubmatrix        --matrix (0/1), --k
   SteinerTree                     --graph, --edge-weights, --terminals
   CVP                             --basis, --target-vec [--bounds]
   MultiprocessorScheduling        --lengths, --num-processors, --deadline
