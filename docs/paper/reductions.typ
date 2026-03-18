@@ -108,6 +108,7 @@
   "SubsetSum": [Subset Sum],
   "MinimumFeedbackArcSet": [Minimum Feedback Arc Set],
   "MinimumFeedbackVertexSet": [Minimum Feedback Vertex Set],
+  "SequencingWithReleaseTimesAndDeadlines": [Sequencing with Release Times and Deadlines],
   "MultipleChoiceBranching": [Multiple Choice Branching],
   "ShortestCommonSupersequence": [Shortest Common Supersequence],
   "MinimumSumMulticenter": [Minimum Sum Multicenter],
@@ -2272,6 +2273,48 @@ NP-completeness was established by Garey, Johnson, and Stockmeyer @gareyJohnsonS
 
   *Example.* Let $A = {3, 7, 1, 8, 2, 4}$ ($n = 6$) and target $B = 11$. Selecting $A' = {3, 8}$ gives sum $3 + 8 = 11 = B$. Another solution: $A' = {7, 4}$ with sum $7 + 4 = 11 = B$.
 ]
+
+#{
+  let x = load-model-example("SequencingWithReleaseTimesAndDeadlines")
+  let n = x.instance.lengths.len()
+  let lengths = x.instance.lengths
+  let release = x.instance.release_times
+  let deadline = x.instance.deadlines
+  let sol = x.optimal.at(0)
+  // Decode Lehmer code to permutation
+  let available = range(n)
+  let perm = ()
+  for c in sol.config {
+    perm = perm + (available.at(c),)
+    available = available.slice(0, c) + available.slice(c + 1)
+  }
+  // Compute start times by simulating the schedule (build (task_idx, start) pairs)
+  let current = 0
+  let schedule = ()
+  for idx in perm {
+    let s = calc.max(current, release.at(idx))
+    schedule = schedule + ((idx, s),)
+    current = s + lengths.at(idx)
+  }
+  [
+    #problem-def("SequencingWithReleaseTimesAndDeadlines")[
+      Given a set $T$ of $n$ tasks and, for each task $t in T$, a processing time $ell(t) in ZZ^+$, a release time $r(t) in ZZ^(>=0)$, and a deadline $d(t) in ZZ^+$, determine whether there exists a one-processor schedule $sigma: T -> ZZ^(>=0)$ such that for all $t in T$: $sigma(t) >= r(t)$, $sigma(t) + ell(t) <= d(t)$, and no two tasks overlap (i.e., $sigma(t) > sigma(t')$ implies $sigma(t) >= sigma(t') + ell(t')$).
+    ][
+      Problem SS1 in Garey and Johnson's appendix @garey1979, and a fundamental single-machine scheduling feasibility problem. It is strongly NP-complete by reduction from 3-Partition, so no pseudo-polynomial time algorithm exists unless P = NP. The problem becomes polynomial-time solvable when: (1) all task lengths equal 1, (2) preemption is allowed, or (3) all release times are zero. The best known exact algorithm for the general case runs in $O^*(2^n dot n)$ time via dynamic programming on task subsets.
+
+      *Example.* Consider #n tasks:
+      #align(center, table(
+        columns: n + 1,
+        align: center,
+        table.header([], ..range(n).map(i => [$t_#(i + 1)$])),
+        [$ell(t)$], ..lengths.map(l => [#l]),
+        [$r(t)$], ..release.map(r => [#r]),
+        [$d(t)$], ..deadline.map(d => [#d]),
+      ))
+      A feasible schedule: #schedule.map(((idx, s)) => [$sigma(t_#(idx + 1)) = #s$ (runs $[#s, #(s + lengths.at(idx)))$)]).join([, ]). All release and deadline constraints are satisfied with no overlap.
+    ]
+  ]
+}
 
 #{
   let x = load-model-example("ShortestCommonSupersequence")

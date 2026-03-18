@@ -59,7 +59,8 @@ pub mod prelude {
     };
     pub use crate::models::misc::{
         BinPacking, Factoring, FlowShopScheduling, Knapsack, LongestCommonSubsequence,
-        MinimumTardinessSequencing, MultiprocessorScheduling, PaintShop, SequencingWithinIntervals,
+        MinimumTardinessSequencing, MultiprocessorScheduling, PaintShop,
+        SequencingWithReleaseTimesAndDeadlines, SequencingWithinIntervals,
         ShortestCommonSupersequence, StaffScheduling, StringToStringCorrection, SubsetSum,
     };
     pub use crate::models::set::{

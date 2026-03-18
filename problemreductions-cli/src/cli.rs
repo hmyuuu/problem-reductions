@@ -473,7 +473,7 @@ pub struct CreateArgs {
     /// Candidate weighted arcs for StrongConnectivityAugmentation (e.g., 2>0:1,2>1:3)
     #[arg(long)]
     pub candidate_arcs: Option<String>,
-    /// Deadlines for MinimumTardinessSequencing (comma-separated, e.g., "5,5,5,3,3")
+    /// Deadlines for scheduling problems (comma-separated, e.g., "5,5,5,3,3")
     #[arg(long)]
     pub deadlines: Option<String>,
     /// Precedence pairs for MinimumTardinessSequencing (e.g., "0>3,1>3,1>4,2>4")
