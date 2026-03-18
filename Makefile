@@ -559,10 +559,8 @@ worktree-pr:
 run-review:
 	@. scripts/make_helpers.sh; \
 	repo=$${REPO:-$$(gh repo view --json nameWithOwner --jq .nameWithOwner)}; \
-	tmp_state=$$(mktemp); \
 	pr="$(N)"; \
-	selection=$$(review_pipeline_context "$$repo" "$$pr" "$$tmp_state"); \
-	rm -f "$$tmp_state"; \
+	selection=$$(review_pipeline_context "$$repo" "$$pr"); \
 	status_name=$$(printf '%s\n' "$$selection" | python3 -c "import sys,json; print(json.load(sys.stdin)['status'])"); \
 	if [ "$$status_name" = "empty" ]; then \
 		echo "No Review pool PRs are currently eligible."; \
