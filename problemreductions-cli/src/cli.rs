@@ -225,6 +225,7 @@ Flags by problem type:
   MinimumMultiwayCut              --graph, --terminals, --edge-weights
   PartitionIntoTriangles          --graph
   GraphPartitioning               --graph
+  HamiltonianCircuit, HC          --graph
   BoundedComponentSpanningForest  --graph, --weights, --k, --bound
   UndirectedTwoCommodityIntegralFlow --graph, --capacities, --source-1, --sink-1, --source-2, --sink-2, --requirement-1, --requirement-2
   IsomorphicSpanningTree          --graph, --tree

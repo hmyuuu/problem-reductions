@@ -9,8 +9,8 @@ use anyhow::{bail, Context, Result};
 use problemreductions::export::{ModelExample, ProblemRef, ProblemSide, RuleExample};
 use problemreductions::models::algebraic::{ClosestVectorProblem, BMF};
 use problemreductions::models::graph::{
-    GraphPartitioning, HamiltonianPath, LengthBoundedDisjointPaths, MinimumMultiwayCut,
-    MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
+    GraphPartitioning, HamiltonianCircuit, HamiltonianPath, LengthBoundedDisjointPaths,
+    MinimumMultiwayCut, MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
 };
 use problemreductions::models::misc::{
     BinPacking, FlowShopScheduling, LongestCommonSubsequence, MinimumTardinessSequencing,
@@ -299,6 +299,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
         "QUBO" => "--matrix \"1,0.5;0.5,2\"",
         "SpinGlass" => "--graph 0-1,1-2 --couplings 1,1",
         "KColoring" => "--graph 0-1,1-2,2-0 --k 3",
+        "HamiltonianCircuit" => "--graph 0-1,1-2,2-3,3-0",
         "MinimumSumMulticenter" => {
             "--graph 0-1,1-2,2-3 --weights 1,1,1,1 --edge-weights 1,1,1 --k 2"
         }
@@ -630,6 +631,19 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             })?;
             (
                 ser(GraphPartitioning::new(graph))?,
+                resolved_variant.clone(),
+            )
+        }
+
+        // Hamiltonian Circuit (graph only, no weights)
+        "HamiltonianCircuit" => {
+            let (graph, _) = parse_graph(args).map_err(|e| {
+                anyhow::anyhow!(
+                    "{e}\n\nUsage: pred create HamiltonianCircuit --graph 0-1,1-2,2-3,3-0"
+                )
+            })?;
+            (
+                ser(HamiltonianCircuit::new(graph))?,
                 resolved_variant.clone(),
             )
         }
@@ -3068,6 +3082,17 @@ fn create_random(
             (ser(GraphPartitioning::new(graph))?, variant)
         }
 
+        // Hamiltonian Circuit (graph only, no weights)
+        "HamiltonianCircuit" => {
+            let edge_prob = args.edge_prob.unwrap_or(0.5);
+            if !(0.0..=1.0).contains(&edge_prob) {
+                bail!("--edge-prob must be between 0.0 and 1.0");
+            }
+            let graph = util::create_random_graph(num_vertices, edge_prob, args.seed);
+            let variant = variant_map(&[("graph", "SimpleGraph")]);
+            (ser(HamiltonianCircuit::new(graph))?, variant)
+        }
+
         // HamiltonianPath (graph only, no weights)
         "HamiltonianPath" => {
             let edge_prob = args.edge_prob.unwrap_or(0.5);
@@ -3219,7 +3244,7 @@ fn create_random(
             "Random generation is not supported for {canonical}. \
              Supported: graph-based problems (MIS, MVC, MaxCut, MaxClique, \
              MaximumMatching, MinimumDominatingSet, SpinGlass, KColoring, TravelingSalesman, \
-             SteinerTree, OptimalLinearArrangement, HamiltonianPath)"
+             HamiltonianCircuit, SteinerTree, OptimalLinearArrangement, HamiltonianPath)"
         ),
     };
 
