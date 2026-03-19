@@ -1,6 +1,7 @@
 //! Miscellaneous problems.
 //!
 //! Problems with unique input structures that don't fit other categories:
+//! - [`AdditionalKey`]: Determine whether a relational schema has an additional candidate key
 //! - [`BinPacking`]: Bin Packing (minimize bins)
 //! - [`BoyceCoddNormalFormViolation`]: Boyce-Codd Normal Form Violation (BCNF)
 //! - [`ConjunctiveBooleanQuery`]: Evaluate a conjunctive Boolean query over relations
@@ -25,6 +26,7 @@
 //! - [`SubsetSum`]: Find a subset summing to exactly a target value
 //! - [`SumOfSquaresPartition`]: Partition integers into K groups minimizing sum of squared group sums
 
+pub(crate) mod additional_key;
 mod bin_packing;
 mod boyce_codd_normal_form_violation;
 pub(crate) mod conjunctive_boolean_query;
@@ -50,6 +52,7 @@ pub(crate) mod string_to_string_correction;
 mod subset_sum;
 pub(crate) mod sum_of_squares_partition;
 
+pub use additional_key::AdditionalKey;
 pub use bin_packing::BinPacking;
 pub use boyce_codd_normal_form_violation::BoyceCoddNormalFormViolation;
 pub use conjunctive_boolean_query::{ConjunctiveBooleanQuery, QueryArg, Relation as CbqRelation};
@@ -94,6 +97,7 @@ pub(crate) fn canonical_model_example_specs() -> Vec<crate::example_db::specs::M
     specs.extend(partially_ordered_knapsack::canonical_model_example_specs());
     specs.extend(string_to_string_correction::canonical_model_example_specs());
     specs.extend(minimum_tardiness_sequencing::canonical_model_example_specs());
+    specs.extend(additional_key::canonical_model_example_specs());
     specs.extend(sequencing_to_minimize_maximum_cumulative_cost::canonical_model_example_specs());
     specs.extend(sum_of_squares_partition::canonical_model_example_specs());
     specs.extend(precedence_constrained_scheduling::canonical_model_example_specs());

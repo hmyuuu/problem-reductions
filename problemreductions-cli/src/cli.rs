@@ -257,6 +257,7 @@ Flags by problem type:
   OptimalLinearArrangement        --graph, --bound
   RuralPostman (RPP)              --graph, --edge-weights, --required-edges, --bound
   MultipleChoiceBranching         --arcs [--weights] --partition --bound [--num-vertices]
+  AdditionalKey                   --num-attributes, --dependencies, --relation-attrs [--known-keys]
   SubgraphIsomorphism             --graph (host), --pattern (pattern)
   LCS                             --strings, --bound [--alphabet-size]
   FAS                             --arcs [--weights] [--num-vertices]
@@ -540,6 +541,18 @@ pub struct CreateArgs {
     /// Alphabet size for LCS, SCS, or StringToStringCorrection (optional; inferred from the input strings if omitted)
     #[arg(long)]
     pub alphabet_size: Option<usize>,
+    /// Number of attributes for AdditionalKey or MinimumCardinalityKey
+    #[arg(long)]
+    pub num_attributes: Option<usize>,
+    /// Functional dependencies for AdditionalKey (e.g., "0,1:2,3;2,3:4,5") or MinimumCardinalityKey (semicolon-separated "lhs>rhs" pairs, e.g., "0,1>2;0,2>3")
+    #[arg(long)]
+    pub dependencies: Option<String>,
+    /// Relation scheme attributes for AdditionalKey (comma-separated, e.g., "0,1,2,3,4,5")
+    #[arg(long)]
+    pub relation_attrs: Option<String>,
+    /// Known candidate keys for AdditionalKey (e.g., "0,1;2,3")
+    #[arg(long)]
+    pub known_keys: Option<String>,
     /// Domain size for ConjunctiveBooleanQuery
     #[arg(long)]
     pub domain_size: Option<usize>,
@@ -558,12 +571,6 @@ pub struct CreateArgs {
     /// Number of groups for SumOfSquaresPartition
     #[arg(long)]
     pub num_groups: Option<usize>,
-    /// Functional dependencies for MinimumCardinalityKey (semicolon-separated "lhs>rhs" pairs, e.g., "0,1>2;0,2>3")
-    #[arg(long)]
-    pub dependencies: Option<String>,
-    /// Number of attributes for MinimumCardinalityKey
-    #[arg(long)]
-    pub num_attributes: Option<usize>,
     /// Source string for StringToStringCorrection (comma-separated symbol indices, e.g., "0,1,2,3")
     #[arg(long)]
     pub source_string: Option<String>,

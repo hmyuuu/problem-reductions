@@ -27,8 +27,8 @@ pub use graph::{
 };
 pub use misc::PartiallyOrderedKnapsack;
 pub use misc::{
-    BinPacking, CbqRelation, ConjunctiveBooleanQuery, ConjunctiveQueryFoldability, Factoring,
-    FlowShopScheduling, Knapsack, LongestCommonSubsequence, MinimumTardinessSequencing,
+    AdditionalKey, BinPacking, CbqRelation, ConjunctiveBooleanQuery, ConjunctiveQueryFoldability,
+    Factoring, FlowShopScheduling, Knapsack, LongestCommonSubsequence, MinimumTardinessSequencing,
     MultiprocessorScheduling, PaintShop, Partition, PrecedenceConstrainedScheduling, QueryArg,
     RectilinearPictureCompression, ResourceConstrainedScheduling,
     SequencingToMinimizeMaximumCumulativeCost, SequencingWithReleaseTimesAndDeadlines,
