@@ -215,6 +215,40 @@ where
 {
 }
 
+#[cfg(feature = "example-db")]
+pub(crate) fn canonical_model_example_specs() -> Vec<crate::example_db::specs::ModelExampleSpec> {
+    vec![crate::example_db::specs::ModelExampleSpec {
+        id: "minimum_cut_into_bounded_sets_i32",
+        instance: Box::new(MinimumCutIntoBoundedSets::new(
+            SimpleGraph::new(
+                8,
+                vec![
+                    (0, 1),
+                    (0, 2),
+                    (1, 2),
+                    (1, 3),
+                    (2, 4),
+                    (3, 5),
+                    (3, 6),
+                    (4, 5),
+                    (4, 6),
+                    (5, 7),
+                    (6, 7),
+                    (5, 6),
+                ],
+            ),
+            vec![2, 3, 1, 4, 2, 1, 3, 2, 1, 2, 3, 1],
+            0,
+            7,
+            5,
+            6,
+        )),
+        // V1={0,1,2,3}, V2={4,5,6,7}: cut edges (2,4)=2,(3,5)=1,(3,6)=3 => 6
+        optimal_config: vec![0, 0, 0, 0, 1, 1, 1, 1],
+        optimal_value: serde_json::json!(true),
+    }]
+}
+
 crate::declare_variants! {
     default sat MinimumCutIntoBoundedSets<SimpleGraph, i32> => "2^num_vertices",
 }

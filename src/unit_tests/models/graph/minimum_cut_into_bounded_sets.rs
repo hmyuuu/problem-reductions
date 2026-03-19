@@ -197,6 +197,18 @@ fn test_minimumcutintoboundedsets_variant() {
     assert!(variant.iter().any(|(k, _)| *k == "weight"));
 }
 
+#[test]
+fn test_minimumcutintoboundedsets_solver_no_solution_issue_instance() {
+    // Issue #228 NO instance: K=5 on the 8-vertex graph has no valid partition
+    let problem = example_instance(5);
+    let solver = BruteForce::new();
+    let solution = solver.find_satisfying(&problem);
+    assert!(
+        solution.is_none(),
+        "Should find no satisfying partition for K=5 on the 8-vertex instance"
+    );
+}
+
 // Verify SatisfactionProblem marker trait is implemented
 #[test]
 fn test_minimumcutintoboundedsets_is_satisfaction_problem() {
