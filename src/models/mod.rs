@@ -19,11 +19,11 @@ pub use graph::{
     GraphPartitioning, HamiltonianCircuit, HamiltonianPath, IsomorphicSpanningTree, KColoring,
     KthBestSpanningTree, LengthBoundedDisjointPaths, MaxCut, MaximalIS, MaximumClique,
     MaximumIndependentSet, MaximumMatching, MinimumCutIntoBoundedSets, MinimumDominatingSet,
-    MinimumFeedbackArcSet,
-    MinimumFeedbackVertexSet, MinimumMultiwayCut, MinimumSumMulticenter, MinimumVertexCover,
-    MultipleChoiceBranching, OptimalLinearArrangement, PartitionIntoPathsOfLength2,
-    PartitionIntoTriangles, RuralPostman, SpinGlass, SteinerTree, StrongConnectivityAugmentation,
-    SubgraphIsomorphism, TravelingSalesman, UndirectedTwoCommodityIntegralFlow,
+    MinimumFeedbackArcSet, MinimumFeedbackVertexSet, MinimumMultiwayCut, MinimumSumMulticenter,
+    MinimumVertexCover, MultipleChoiceBranching, OptimalLinearArrangement,
+    PartitionIntoPathsOfLength2, PartitionIntoTriangles, RuralPostman, SpinGlass, SteinerTree,
+    StrongConnectivityAugmentation, SubgraphIsomorphism, TravelingSalesman,
+    UndirectedTwoCommodityIntegralFlow,
 };
 pub use misc::PartiallyOrderedKnapsack;
 pub use misc::{

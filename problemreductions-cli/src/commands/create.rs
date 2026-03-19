@@ -11,8 +11,7 @@ use problemreductions::models::algebraic::{ClosestVectorProblem, ConsecutiveOnes
 use problemreductions::models::graph::{
     GeneralizedHex, GraphPartitioning, HamiltonianCircuit, HamiltonianPath,
     LengthBoundedDisjointPaths, MinimumCutIntoBoundedSets, MinimumMultiwayCut,
-    MultipleChoiceBranching, SteinerTree,
-    StrongConnectivityAugmentation,
+    MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
 };
 use problemreductions::models::misc::{
     BinPacking, CbqRelation, ConjunctiveBooleanQuery, FlowShopScheduling, LongestCommonSubsequence,
