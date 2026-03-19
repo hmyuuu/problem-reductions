@@ -14,9 +14,10 @@ use problemreductions::models::graph::{
     MultipleChoiceBranching, SteinerTree, StrongConnectivityAugmentation,
 };
 use problemreductions::models::misc::{
-    BinPacking, CbqRelation, ConjunctiveBooleanQuery, FlowShopScheduling, LongestCommonSubsequence,
-    MinimumTardinessSequencing, MultiprocessorScheduling, PaintShop, PartiallyOrderedKnapsack,
-    QueryArg, RectilinearPictureCompression, ResourceConstrainedScheduling,
+    BinPacking, BoyceCoddNormalFormViolation, CbqRelation, ConjunctiveBooleanQuery,
+    FlowShopScheduling, LongestCommonSubsequence, MinimumTardinessSequencing,
+    MultiprocessorScheduling, PaintShop, PartiallyOrderedKnapsack, QueryArg,
+    RectilinearPictureCompression, ResourceConstrainedScheduling,
     SequencingToMinimizeMaximumCumulativeCost, SequencingWithReleaseTimesAndDeadlines,
     SequencingWithinIntervals, ShortestCommonSupersequence, StringToStringCorrection, SubsetSum,
     SumOfSquaresPartition,
@@ -152,6 +153,20 @@ fn format_problem_ref(problem: &ProblemRef) -> String {
         .collect::<Vec<_>>()
         .join("/");
     format!("{}/{}", problem.name, values)
+}
+
+fn ensure_attribute_indices_in_range(
+    indices: &[usize],
+    num_attributes: usize,
+    context: &str,
+) -> Result<()> {
+    for &attr in indices {
+        anyhow::ensure!(
+            attr < num_attributes,
+            "{context} contains attribute index {attr}, which is out of range for --n {num_attributes}"
+        );
+    }
+    Ok(())
 }
 
 fn resolve_example_problem_ref(
@@ -402,6 +417,9 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
             "--matrix \"1,1,0,0;1,1,0,0;0,0,1,1;0,0,1,1\" --k 2"
         }
         "SubsetSum" => "--sizes 3,7,1,8,2,4 --target 11",
+        "BoyceCoddNormalFormViolation" => {
+            "--n 6 --sets \"0,1:2;2:3;3,4:5\" --target 0,1,2,3,4,5"
+        }
         "SumOfSquaresPartition" => "--sizes 5,3,8,2,7,1 --num-groups 3 --bound 240",
         "ComparativeContainment" => {
             "--universe 4 --r-sets \"0,1,2,3;0,1\" --s-sets \"0,1,2,3;2,3\" --r-weights 2,5 --s-weights 3,6"
@@ -1299,6 +1317,58 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
         // MaximalIS — same as MIS (graph + vertex weights)
         "MaximalIS" => {
             create_vertex_weight_problem(args, canonical, graph_type, &resolved_variant)?
+        }
+
+        // BoyceCoddNormalFormViolation
+        "BoyceCoddNormalFormViolation" => {
+            let n = args.n.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "BoyceCoddNormalFormViolation requires --n, --sets, and --target\n\n\
+                     Usage: pred create BoyceCoddNormalFormViolation --n 6 --sets \"0,1:2;2:3;3,4:5\" --target 0,1,2,3,4,5"
+                )
+            })?;
+            let sets_str = args.sets.as_deref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "BoyceCoddNormalFormViolation requires --sets (functional deps as lhs:rhs;...)\n\n\
+                     Usage: pred create BoyceCoddNormalFormViolation --n 6 --sets \"0,1:2;2:3;3,4:5\" --target 0,1,2,3,4,5"
+                )
+            })?;
+            let target_str = args.target.as_deref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "BoyceCoddNormalFormViolation requires --target (comma-separated attribute indices)\n\n\
+                     Usage: pred create BoyceCoddNormalFormViolation --n 6 --sets \"0,1:2;2:3;3,4:5\" --target 0,1,2,3,4,5"
+                )
+            })?;
+            let fds: Vec<(Vec<usize>, Vec<usize>)> = sets_str
+                .split(';')
+                .map(|fd_str| {
+                    let parts: Vec<&str> = fd_str.split(':').collect();
+                    anyhow::ensure!(
+                        parts.len() == 2,
+                        "Each FD must be lhs:rhs, got '{}'",
+                        fd_str
+                    );
+                    let lhs: Vec<usize> = util::parse_comma_list(parts[0])?;
+                    let rhs: Vec<usize> = util::parse_comma_list(parts[1])?;
+                    ensure_attribute_indices_in_range(
+                        &lhs,
+                        n,
+                        &format!("Functional dependency '{fd_str}' lhs"),
+                    )?;
+                    ensure_attribute_indices_in_range(
+                        &rhs,
+                        n,
+                        &format!("Functional dependency '{fd_str}' rhs"),
+                    )?;
+                    Ok((lhs, rhs))
+                })
+                .collect::<Result<_>>()?;
+            let target: Vec<usize> = util::parse_comma_list(target_str)?;
+            ensure_attribute_indices_in_range(&target, n, "Target subset")?;
+            (
+                ser(BoyceCoddNormalFormViolation::new(n, fds, target))?,
+                resolved_variant.clone(),
+            )
         }
 
         // BinPacking
@@ -4007,6 +4077,7 @@ mod tests {
     use super::help_flag_name;
     use super::parse_bool_rows;
     use super::*;
+    use super::{ensure_attribute_indices_in_range, problem_help_flag_name};
     use crate::cli::{Cli, Commands};
     use crate::output::OutputConfig;
 
@@ -4036,6 +4107,16 @@ mod tests {
                 false,
             ),
             "num-paths-required"
+        );
+    }
+
+    #[test]
+    fn test_ensure_attribute_indices_in_range_rejects_out_of_range_index() {
+        let err = ensure_attribute_indices_in_range(&[0, 4], 3, "Functional dependency '0:4' rhs")
+            .unwrap_err();
+        assert!(
+            err.to_string().contains("out of range"),
+            "unexpected error: {err}"
         );
     }
 
