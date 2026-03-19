@@ -144,6 +144,14 @@ fn test_all_problems_implement_trait_correctly() {
         "FlowShopScheduling",
     );
     check_problem_trait(
+        &SequencingToMinimizeWeightedTardiness::new(vec![3, 4, 2], vec![2, 3, 1], vec![5, 8, 4], 4),
+        "SequencingToMinimizeWeightedTardiness",
+    );
+    check_problem_trait(
+        &MinimumTardinessSequencing::new(3, vec![2, 3, 1], vec![(0, 2)]),
+        "MinimumTardinessSequencing",
+    );
+    check_problem_trait(
         &PartitionIntoPathsOfLength2::new(SimpleGraph::new(
             6,
             vec![(0, 1), (1, 2), (3, 4), (4, 5)],

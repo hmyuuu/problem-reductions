@@ -31,9 +31,9 @@ pub use misc::{
     Factoring, FlowShopScheduling, Knapsack, LongestCommonSubsequence, MinimumTardinessSequencing,
     MultiprocessorScheduling, PaintShop, Partition, PrecedenceConstrainedScheduling, QueryArg,
     RectilinearPictureCompression, ResourceConstrainedScheduling,
-    SequencingToMinimizeMaximumCumulativeCost, SequencingWithReleaseTimesAndDeadlines,
-    SequencingWithinIntervals, ShortestCommonSupersequence, StaffScheduling,
-    StringToStringCorrection, SubsetSum, SumOfSquaresPartition, Term,
+    SequencingToMinimizeMaximumCumulativeCost, SequencingToMinimizeWeightedTardiness,
+    SequencingWithReleaseTimesAndDeadlines, SequencingWithinIntervals, ShortestCommonSupersequence,
+    StaffScheduling, StringToStringCorrection, SubsetSum, SumOfSquaresPartition, Term,
 };
 pub use set::{
     ComparativeContainment, ConsecutiveSets, ExactCoverBy3Sets, MaximumSetPacking,

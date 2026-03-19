@@ -271,6 +271,7 @@ Flags by problem type:
   StaffScheduling                 --schedules, --requirements, --num-workers, --k
   MinimumTardinessSequencing      --n, --deadlines [--precedence-pairs]
   SequencingToMinimizeMaximumCumulativeCost --costs, --bound [--precedence-pairs]
+  SequencingToMinimizeWeightedTardiness --sizes, --weights, --deadlines, --bound
   RectilinearPictureCompression   --matrix (0/1), --k
   SCS                             --strings, --bound [--alphabet-size]
   StringToStringCorrection         --source-string, --target-string, --bound [--alphabet-size]
