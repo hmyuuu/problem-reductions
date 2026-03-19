@@ -16,9 +16,8 @@ use problemreductions::models::misc::{
     BinPacking, CbqRelation, ConjunctiveBooleanQuery, FlowShopScheduling, LongestCommonSubsequence,
     MinimumTardinessSequencing, MultiprocessorScheduling, PaintShop, PartiallyOrderedKnapsack,
     QueryArg, RectilinearPictureCompression, ResourceConstrainedScheduling,
-    SequencingWithReleaseTimesAndDeadlines,
-    SequencingWithinIntervals, ShortestCommonSupersequence, StringToStringCorrection, SubsetSum,
-    SumOfSquaresPartition,
+    SequencingWithReleaseTimesAndDeadlines, SequencingWithinIntervals, ShortestCommonSupersequence,
+    StringToStringCorrection, SubsetSum, SumOfSquaresPartition,
 };
 use problemreductions::models::BiconnectivityAugmentation;
 use problemreductions::prelude::*;
@@ -363,6 +362,7 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
             "--num-attributes 6 --dependencies \"0,1>2;0,2>3;1,3>4;2,4>5\" --k 2"
         }
         "ShortestCommonSupersequence" => "--strings \"0,1,2;1,2,0\" --bound 4",
+        "ConjunctiveQueryFoldability" => "(use --example ConjunctiveQueryFoldability)",
         "ConjunctiveBooleanQuery" => {
             "--domain-size 6 --relations \"2:0,3|1,3|2,4;3:0,1,5|1,2,5\" --conjuncts-spec \"0:v0,c3;0:v1,c3;1:v0,v1,c5\""
         }
@@ -1638,18 +1638,24 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
         // ResourceConstrainedScheduling
         "ResourceConstrainedScheduling" => {
             let usage = "Usage: pred create ResourceConstrainedScheduling --num-processors 3 --resource-bounds \"20\" --resource-requirements \"6;7;7;6;8;6\" --deadline 2";
-            let num_processors = args
-                .num_processors
-                .ok_or_else(|| anyhow::anyhow!("ResourceConstrainedScheduling requires --num-processors\n\n{usage}"))?;
+            let num_processors = args.num_processors.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "ResourceConstrainedScheduling requires --num-processors\n\n{usage}"
+                )
+            })?;
             let bounds_str = args.resource_bounds.as_deref().ok_or_else(|| {
-                anyhow::anyhow!("ResourceConstrainedScheduling requires --resource-bounds\n\n{usage}")
+                anyhow::anyhow!(
+                    "ResourceConstrainedScheduling requires --resource-bounds\n\n{usage}"
+                )
             })?;
             let reqs_str = args.resource_requirements.as_deref().ok_or_else(|| {
-                anyhow::anyhow!("ResourceConstrainedScheduling requires --resource-requirements\n\n{usage}")
+                anyhow::anyhow!(
+                    "ResourceConstrainedScheduling requires --resource-requirements\n\n{usage}"
+                )
             })?;
-            let deadline = args
-                .deadline
-                .ok_or_else(|| anyhow::anyhow!("ResourceConstrainedScheduling requires --deadline\n\n{usage}"))?;
+            let deadline = args.deadline.ok_or_else(|| {
+                anyhow::anyhow!("ResourceConstrainedScheduling requires --deadline\n\n{usage}")
+            })?;
 
             let resource_bounds: Vec<u64> = util::parse_comma_list(bounds_str)?;
             let resource_requirements: Vec<Vec<u64>> = reqs_str
@@ -2146,6 +2152,14 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
             (
                 ser(MinimumFeedbackVertexSet::new(graph, weights))?,
                 resolved_variant.clone(),
+            )
+        }
+
+        "ConjunctiveQueryFoldability" => {
+            bail!(
+                "ConjunctiveQueryFoldability has complex nested input.\n\n\
+                 Use: pred create --example ConjunctiveQueryFoldability\n\
+                 Or provide a JSON file directly."
             )
         }
 
