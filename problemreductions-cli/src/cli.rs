@@ -226,6 +226,7 @@ Flags by problem type:
   PartitionIntoTriangles          --graph
   GraphPartitioning               --graph
   GeneralizedHex                  --graph, --source, --sink
+  MinimumCutIntoBoundedSets       --graph, --edge-weights, --source, --sink, --size-bound, --cut-bound
   HamiltonianCircuit, HC          --graph
   BoundedComponentSpanningForest  --graph, --weights, --k, --bound
   UndirectedTwoCommodityIntegralFlow --graph, --capacities, --source-1, --sink-1, --source-2, --sink-2, --requirement-1, --requirement-2
@@ -328,10 +329,10 @@ pub struct CreateArgs {
     /// Edge capacities for multicommodity flow problems (e.g., 1,1,2)
     #[arg(long)]
     pub capacities: Option<String>,
-    /// Source vertex for path-based graph problems
+    /// Source vertex for path-based graph problems and MinimumCutIntoBoundedSets
     #[arg(long)]
     pub source: Option<usize>,
-    /// Sink vertex for path-based graph problems
+    /// Sink vertex for path-based graph problems and MinimumCutIntoBoundedSets
     #[arg(long)]
     pub sink: Option<usize>,
     /// Required number of paths for LengthBoundedDisjointPaths
@@ -478,6 +479,12 @@ pub struct CreateArgs {
     /// Directed arcs for directed graph problems (e.g., 0>1,1>2,2>0)
     #[arg(long)]
     pub arcs: Option<String>,
+    /// Size bound for partition sets (for MinimumCutIntoBoundedSets)
+    #[arg(long)]
+    pub size_bound: Option<usize>,
+    /// Cut weight bound (for MinimumCutIntoBoundedSets)
+    #[arg(long)]
+    pub cut_bound: Option<i32>,
     /// Item values (e.g., 3,4,5,7) for PartiallyOrderedKnapsack
     #[arg(long)]
     pub values: Option<String>,

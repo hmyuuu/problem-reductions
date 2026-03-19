@@ -53,10 +53,11 @@ pub mod prelude {
     };
     pub use crate::models::graph::{
         KColoring, MaxCut, MaximalIS, MaximumClique, MaximumIndependentSet, MaximumMatching,
-        MinimumDominatingSet, MinimumFeedbackArcSet, MinimumFeedbackVertexSet, MinimumMultiwayCut,
-        MinimumSumMulticenter, MinimumVertexCover, MultipleChoiceBranching,
-        OptimalLinearArrangement, PartitionIntoPathsOfLength2, PartitionIntoTriangles,
-        RuralPostman, TravelingSalesman, UndirectedTwoCommodityIntegralFlow,
+        MinimumCutIntoBoundedSets, MinimumDominatingSet, MinimumFeedbackArcSet,
+        MinimumFeedbackVertexSet, MinimumMultiwayCut, MinimumSumMulticenter, MinimumVertexCover,
+        MultipleChoiceBranching, OptimalLinearArrangement, PartitionIntoPathsOfLength2,
+        PartitionIntoTriangles, RuralPostman, TravelingSalesman,
+        UndirectedTwoCommodityIntegralFlow,
     };
     pub use crate::models::misc::{
         BinPacking, CbqRelation, ConjunctiveBooleanQuery, ConjunctiveQueryFoldability, Factoring,
