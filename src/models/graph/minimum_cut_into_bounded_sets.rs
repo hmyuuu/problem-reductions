@@ -4,7 +4,7 @@
 //! into two bounded-size sets (containing designated source and sink vertices)
 //! with total cut weight at most K. From Garey & Johnson, A2 ND17.
 
-use crate::registry::{FieldInfo, ProblemSchemaEntry};
+use crate::registry::{FieldInfo, ProblemSchemaEntry, VariantDimension};
 use crate::topology::{Graph, SimpleGraph};
 use crate::traits::{Problem, SatisfactionProblem};
 use crate::types::WeightElement;
@@ -14,6 +14,12 @@ use serde::{Deserialize, Serialize};
 inventory::submit! {
     ProblemSchemaEntry {
         name: "MinimumCutIntoBoundedSets",
+        display_name: "Minimum Cut Into Bounded Sets",
+        aliases: &[],
+        dimensions: &[
+            VariantDimension::new("graph", "SimpleGraph", &["SimpleGraph"]),
+            VariantDimension::new("weight", "i32", &["i32"]),
+        ],
         module_path: module_path!(),
         description: "Partition vertices into two bounded-size sets with cut weight at most K",
         fields: &[
@@ -210,7 +216,7 @@ where
 }
 
 crate::declare_variants! {
-    MinimumCutIntoBoundedSets<SimpleGraph, i32> => "2^num_vertices",
+    default sat MinimumCutIntoBoundedSets<SimpleGraph, i32> => "2^num_vertices",
 }
 
 #[cfg(test)]

@@ -327,10 +327,10 @@ pub struct CreateArgs {
     /// Edge capacities for multicommodity flow problems (e.g., 1,1,2)
     #[arg(long)]
     pub capacities: Option<String>,
-    /// Source vertex for path-based graph problems
+    /// Source vertex for path-based graph problems and MinimumCutIntoBoundedSets
     #[arg(long)]
     pub source: Option<usize>,
-    /// Sink vertex for path-based graph problems
+    /// Sink vertex for path-based graph problems and MinimumCutIntoBoundedSets
     #[arg(long)]
     pub sink: Option<usize>,
     /// Required number of paths for LengthBoundedDisjointPaths
@@ -477,12 +477,6 @@ pub struct CreateArgs {
     /// Directed arcs for directed graph problems (e.g., 0>1,1>2,2>0)
     #[arg(long)]
     pub arcs: Option<String>,
-    /// Source vertex index (for MinimumCutIntoBoundedSets)
-    #[arg(long)]
-    pub source: Option<usize>,
-    /// Sink vertex index (for MinimumCutIntoBoundedSets)
-    #[arg(long)]
-    pub sink: Option<usize>,
     /// Size bound for partition sets (for MinimumCutIntoBoundedSets)
     #[arg(long)]
     pub size_bound: Option<usize>,
