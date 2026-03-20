@@ -4724,6 +4724,72 @@ fn test_inspect_undirected_two_commodity_integral_flow_reports_size_fields() {
     std::fs::remove_file(&result_file).ok();
 }
 
+#[test]
+fn test_inspect_multiple_copy_file_allocation_reports_size_fields() {
+    let problem_file = std::env::temp_dir().join("pred_test_mcfa_inspect_in.json");
+    let result_file = std::env::temp_dir().join("pred_test_mcfa_inspect_out.json");
+    let create_out = pred()
+        .args([
+            "-o",
+            problem_file.to_str().unwrap(),
+            "create",
+            "--example",
+            "MultipleCopyFileAllocation",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        create_out.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&create_out.stderr)
+    );
+
+    let output = pred()
+        .args([
+            "-o",
+            result_file.to_str().unwrap(),
+            "inspect",
+            problem_file.to_str().unwrap(),
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(result_file.exists());
+
+    let content = std::fs::read_to_string(&result_file).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&content).unwrap();
+    let size_fields: Vec<&str> = json["size_fields"]
+        .as_array()
+        .expect("size_fields should be an array")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert!(
+        size_fields.contains(&"num_vertices"),
+        "MultipleCopyFileAllocation size_fields should contain num_vertices, got: {:?}",
+        size_fields
+    );
+    assert!(
+        size_fields.contains(&"num_edges"),
+        "MultipleCopyFileAllocation size_fields should contain num_edges, got: {:?}",
+        size_fields
+    );
+    let solvers: Vec<&str> = json["solvers"]
+        .as_array()
+        .expect("solvers should be an array")
+        .iter()
+        .map(|v| v.as_str().unwrap())
+        .collect();
+    assert_eq!(solvers, vec!["brute-force"]);
+
+    std::fs::remove_file(&problem_file).ok();
+    std::fs::remove_file(&result_file).ok();
+}
+
 // ---- Random generation tests ----
 
 #[test]
@@ -5152,6 +5218,44 @@ fn test_create_bcnf_rejects_out_of_range_target_attribute_indices() {
 }
 
 #[test]
+fn test_create_multiple_copy_file_allocation() {
+    let output = pred()
+        .args([
+            "create",
+            "MultipleCopyFileAllocation",
+            "--graph",
+            "0-1,1-2,2-3",
+            "--usage",
+            "5,4,3,2",
+            "--storage",
+            "1,1,1,1",
+            "--bound",
+            "8",
+        ])
+        .output()
+        .unwrap();
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let stdout = String::from_utf8(output.stdout).unwrap();
+    let json: serde_json::Value = serde_json::from_str(&stdout).unwrap();
+    assert_eq!(json["type"], "MultipleCopyFileAllocation");
+    assert_eq!(json["data"]["usage"], serde_json::json!([5, 4, 3, 2]));
+    assert_eq!(json["data"]["storage"], serde_json::json!([1, 1, 1, 1]));
+    assert_eq!(json["data"]["bound"], 8);
+    assert_eq!(json["data"]["graph"]["num_vertices"], 4);
+    assert_eq!(
+        json["data"]["graph"]["edges"]
+            .as_array()
+            .unwrap()
+            .len(),
+        3
+    );
+}
+
+#[test]
 fn test_create_sequencing_to_minimize_maximum_cumulative_cost() {
     let output = pred()
         .args([
@@ -5186,6 +5290,31 @@ fn test_create_sequencing_to_minimize_maximum_cumulative_cost() {
 }
 
 #[test]
+fn test_create_multiple_copy_file_allocation_no_flags_shows_help() {
+    let output = pred()
+        .args(["create", "MultipleCopyFileAllocation"])
+        .output()
+        .unwrap();
+    assert!(
+        !output.status.success(),
+        "should exit non-zero when showing help without data flags"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("--usage"),
+        "expected '--usage' in help output, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("--storage"),
+        "expected '--storage' in help output, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("--bound"),
+        "expected '--bound' in help output, got: {stderr}"
+    );
+}
+
+#[test]
 fn test_create_sequencing_to_minimize_maximum_cumulative_cost_no_flags_shows_help() {
     let output = pred()
         .args(["create", "SequencingToMinimizeMaximumCumulativeCost"])
@@ -5203,6 +5332,35 @@ fn test_create_sequencing_to_minimize_maximum_cumulative_cost_no_flags_shows_hel
     assert!(
         stderr.contains("--bound"),
         "expected '--bound' in help output, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_create_multiple_copy_file_allocation_rejects_length_mismatch() {
+    let output = pred()
+        .args([
+            "create",
+            "MultipleCopyFileAllocation",
+            "--graph",
+            "0-1,1-2,2-3",
+            "--usage",
+            "5,4",
+            "--storage",
+            "1,1,1,1",
+            "--bound",
+            "8",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("usage"),
+        "expected usage-length diagnostic, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("Usage: pred create MultipleCopyFileAllocation"),
+        "expected recovery usage hint, got: {stderr}"
     );
 }
 
@@ -5226,6 +5384,35 @@ fn test_create_sequencing_to_minimize_maximum_cumulative_cost_missing_costs() {
 }
 
 #[test]
+fn test_create_multiple_copy_file_allocation_rejects_storage_length_mismatch() {
+    let output = pred()
+        .args([
+            "create",
+            "MultipleCopyFileAllocation",
+            "--graph",
+            "0-1,1-2,2-3",
+            "--usage",
+            "5,4,3,2",
+            "--storage",
+            "1,1",
+            "--bound",
+            "8",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("storage"),
+        "expected storage-length diagnostic, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("Usage: pred create MultipleCopyFileAllocation"),
+        "expected recovery usage hint, got: {stderr}"
+    );
+}
+
+#[test]
 fn test_create_sequencing_to_minimize_maximum_cumulative_cost_bad_precedence() {
     let output = pred()
         .args([
@@ -5245,6 +5432,35 @@ fn test_create_sequencing_to_minimize_maximum_cumulative_cost_bad_precedence() {
     assert!(
         stderr.contains("precedence"),
         "expected precedence validation error, got: {stderr}"
+    );
+}
+
+#[test]
+fn test_create_multiple_copy_file_allocation_rejects_invalid_usage_values() {
+    let output = pred()
+        .args([
+            "create",
+            "MultipleCopyFileAllocation",
+            "--graph",
+            "0-1,1-2,2-3",
+            "--usage",
+            "5,x,3,2",
+            "--storage",
+            "1,1,1,1",
+            "--bound",
+            "8",
+        ])
+        .output()
+        .unwrap();
+    assert!(!output.status.success());
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("invalid usage list"),
+        "expected usage parse diagnostic, got: {stderr}"
+    );
+    assert!(
+        stderr.contains("Usage: pred create MultipleCopyFileAllocation"),
+        "expected recovery usage hint, got: {stderr}"
     );
 }
 
@@ -5337,21 +5553,15 @@ fn test_evaluate_multiprocessor_scheduling_rejects_zero_processors_json() {
 }
 
 #[test]
-fn test_solve_multiprocessor_scheduling_default_solver_suggests_brute_force() {
-    let problem_file =
-        std::env::temp_dir().join("pred_test_solve_multiprocessor_default_solver.json");
+fn test_solve_multiple_copy_file_allocation_brute_force() {
+    let problem_file = std::env::temp_dir().join("pred_test_solve_mcfa_bf.json");
     let create_out = pred()
         .args([
             "-o",
             problem_file.to_str().unwrap(),
             "create",
-            "MultiprocessorScheduling",
-            "--lengths",
-            "4,5,3,2,6",
-            "--num-processors",
-            "2",
-            "--deadline",
-            "10",
+            "--example",
+            "MultipleCopyFileAllocation",
         ])
         .output()
         .unwrap();
@@ -5362,20 +5572,24 @@ fn test_solve_multiprocessor_scheduling_default_solver_suggests_brute_force() {
     );
 
     let output = pred()
-        .args(["solve", problem_file.to_str().unwrap()])
+        .args([
+            "solve",
+            problem_file.to_str().unwrap(),
+            "--solver",
+            "brute-force",
+        ])
         .output()
         .unwrap();
     assert!(
-        !output.status.success(),
-        "stdout: {}",
-        String::from_utf8_lossy(&output.stdout)
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
-    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8(output.stdout).unwrap();
     assert!(
-        stderr.contains("No reduction path from MultiprocessorScheduling to ILP"),
-        "stderr: {stderr}"
+        stdout.contains("\"solver\": \"brute-force\""),
+        "MultipleCopyFileAllocation should solve with brute-force: {stdout}"
     );
-    assert!(stderr.contains("--solver brute-force"), "stderr: {stderr}");
 
     std::fs::remove_file(&problem_file).ok();
 }

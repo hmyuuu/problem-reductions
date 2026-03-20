@@ -20,9 +20,9 @@ pub use graph::{
     KthBestSpanningTree, LengthBoundedDisjointPaths, MaxCut, MaximalIS, MaximumClique,
     MaximumIndependentSet, MaximumMatching, MinimumCutIntoBoundedSets, MinimumDominatingSet,
     MinimumFeedbackArcSet, MinimumFeedbackVertexSet, MinimumMultiwayCut, MinimumSumMulticenter,
-    MinimumVertexCover, MultipleChoiceBranching, OptimalLinearArrangement,
-    PartitionIntoPathsOfLength2, PartitionIntoTriangles, RuralPostman, SpinGlass, SteinerTree,
-    StrongConnectivityAugmentation, SubgraphIsomorphism, TravelingSalesman,
+    MinimumVertexCover, MultipleChoiceBranching, MultipleCopyFileAllocation,
+    OptimalLinearArrangement, PartitionIntoPathsOfLength2, PartitionIntoTriangles, RuralPostman,
+    SpinGlass, SteinerTree, StrongConnectivityAugmentation, SubgraphIsomorphism, TravelingSalesman,
     UndirectedTwoCommodityIntegralFlow,
 };
 pub use misc::PartiallyOrderedKnapsack;

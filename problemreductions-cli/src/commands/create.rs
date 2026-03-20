@@ -32,6 +32,11 @@ use problemreductions::topology::{
 use serde::Serialize;
 use std::collections::{BTreeMap, BTreeSet};
 
+const MULTIPLE_COPY_FILE_ALLOCATION_EXAMPLE_ARGS: &str =
+    "--graph 0-1,1-2,2-3 --usage 5,4,3,2 --storage 1,1,1,1 --bound 8";
+const MULTIPLE_COPY_FILE_ALLOCATION_USAGE: &str =
+    "Usage: pred create MultipleCopyFileAllocation --graph 0-1,1-2,2-3 --usage 5,4,3,2 --storage 1,1,1,1 --bound 8";
+
 /// Check if all data flags are None (no problem-specific input provided).
 fn all_data_flags_empty(args: &CreateArgs) -> bool {
     args.graph.is_none()
@@ -89,6 +94,8 @@ fn all_data_flags_empty(args: &CreateArgs) -> bool {
         && args.strings.is_none()
         && args.costs.is_none()
         && args.arcs.is_none()
+        && args.usage.is_none()
+        && args.storage.is_none()
         && args.source.is_none()
         && args.sink.is_none()
         && args.size_bound.is_none()
@@ -99,6 +106,7 @@ fn all_data_flags_empty(args: &CreateArgs) -> bool {
         && args.candidate_arcs.is_none()
         && args.potential_edges.is_none()
         && args.budget.is_none()
+        && args.deadlines.is_none()
         && args.precedence_pairs.is_none()
         && args.resource_bounds.is_none()
         && args.resource_requirements.is_none()
@@ -402,6 +410,9 @@ fn example_for(canonical: &str, graph_type: Option<&str>) -> &'static str {
             "--schedules \"1,1,1,1,1,0,0;0,1,1,1,1,1,0;0,0,1,1,1,1,1;1,0,0,1,1,1,1;1,1,0,0,1,1,1\" --requirements 2,2,2,3,3,2,1 --num-workers 4 --k 5"
         }
         "SteinerTree" => "--graph 0-1,1-2,1-3,3-4 --edge-weights 2,2,1,1 --terminals 0,2,4",
+        "MultipleCopyFileAllocation" => {
+            MULTIPLE_COPY_FILE_ALLOCATION_EXAMPLE_ARGS
+        }
         "OptimalLinearArrangement" => "--graph 0-1,1-2,2-3 --bound 5",
         "DirectedTwoCommodityIntegralFlow" => {
             "--arcs \"0>2,0>3,1>2,1>3,2>4,2>5,3>4,3>5\" --capacities 1,1,1,1,1,1,1,1 --source-1 0 --sink-1 4 --source-2 1 --sink-2 5 --requirement-1 1 --requirement-2 1"
@@ -955,6 +966,37 @@ pub fn create(args: &CreateArgs, out: &OutputConfig) -> Result<()> {
                 anyhow::anyhow!("{e}\n\nUsage: pred create HamiltonianPath --graph 0-1,1-2,2-3")
             })?;
             (ser(HamiltonianPath::new(graph))?, resolved_variant.clone())
+        }
+
+        // MultipleCopyFileAllocation (graph + usage + storage + bound)
+        "MultipleCopyFileAllocation" => {
+            let (graph, num_vertices) = parse_graph(args)
+                .map_err(|e| anyhow::anyhow!("{e}\n\n{MULTIPLE_COPY_FILE_ALLOCATION_USAGE}"))?;
+            let usage = parse_vertex_i64_values(
+                args.usage.as_deref(),
+                "usage",
+                num_vertices,
+                "MultipleCopyFileAllocation",
+                MULTIPLE_COPY_FILE_ALLOCATION_USAGE,
+            )?;
+            let storage = parse_vertex_i64_values(
+                args.storage.as_deref(),
+                "storage",
+                num_vertices,
+                "MultipleCopyFileAllocation",
+                MULTIPLE_COPY_FILE_ALLOCATION_USAGE,
+            )?;
+            let bound = args.bound.ok_or_else(|| {
+                anyhow::anyhow!(
+                    "MultipleCopyFileAllocation requires --bound\n\n{MULTIPLE_COPY_FILE_ALLOCATION_USAGE}"
+                )
+            })?;
+            (
+                ser(MultipleCopyFileAllocation::new(
+                    graph, usage, storage, bound,
+                ))?,
+                resolved_variant.clone(),
+            )
         }
 
         // UndirectedTwoCommodityIntegralFlow (graph + capacities + terminals + requirements)
@@ -3105,6 +3147,29 @@ fn parse_vertex_weights(args: &CreateArgs, num_vertices: usize) -> Result<Vec<i3
     }
 }
 
+fn parse_vertex_i64_values(
+    raw: Option<&str>,
+    field_name: &str,
+    num_vertices: usize,
+    problem_name: &str,
+    usage: &str,
+) -> Result<Vec<i64>> {
+    let raw =
+        raw.ok_or_else(|| anyhow::anyhow!("{problem_name} requires --{field_name}\n\n{usage}"))?;
+    let values: Vec<i64> = util::parse_comma_list(raw)
+        .map_err(|e| anyhow::anyhow!("invalid {field_name} list: {e}\n\n{usage}"))?;
+    if values.len() != num_vertices {
+        bail!(
+            "Expected {} {} values but got {}\n\n{}",
+            num_vertices,
+            field_name,
+            values.len(),
+            usage
+        );
+    }
+    Ok(values)
+}
+
 /// Parse `--terminals` as comma-separated vertex indices.
 fn parse_terminals(args: &CreateArgs, num_vertices: usize) -> Result<Vec<usize>> {
     let s = args
@@ -4554,6 +4619,8 @@ mod tests {
             costs: None,
             cut_bound: None,
             size_bound: None,
+            usage: None,
+            storage: None,
         }
     }
 

@@ -251,6 +251,7 @@ Flags by problem type:
   BMF                             --matrix (0/1), --rank
   ConsecutiveOnesSubmatrix        --matrix (0/1), --k
   SteinerTree                     --graph, --edge-weights, --terminals
+  MultipleCopyFileAllocation      --graph, --usage, --storage, --bound
   CVP                             --basis, --target-vec [--bounds]
   MultiprocessorScheduling        --lengths, --num-processors, --deadline
   SequencingWithinIntervals       --release-times, --deadlines, --lengths
@@ -470,7 +471,7 @@ pub struct CreateArgs {
     /// Required edge indices for RuralPostman (comma-separated, e.g., "0,2,4")
     #[arg(long)]
     pub required_edges: Option<String>,
-    /// Upper bound or length bound (for BoundedComponentSpanningForest, LengthBoundedDisjointPaths, LongestCommonSubsequence, MultipleChoiceBranching, OptimalLinearArrangement, RuralPostman, ShortestCommonSupersequence, or StringToStringCorrection)
+    /// Upper bound or length bound (for BoundedComponentSpanningForest, LengthBoundedDisjointPaths, LongestCommonSubsequence, MultipleCopyFileAllocation, MultipleChoiceBranching, OptimalLinearArrangement, RuralPostman, ShortestCommonSupersequence, or StringToStringCorrection)
     #[arg(long, allow_hyphen_values = true)]
     pub bound: Option<i64>,
     /// Pattern graph edge list for SubgraphIsomorphism (e.g., 0-1,1-2,2-0)
@@ -509,6 +510,12 @@ pub struct CreateArgs {
     /// Candidate weighted arcs for StrongConnectivityAugmentation (e.g., 2>0:1,2>1:3)
     #[arg(long)]
     pub candidate_arcs: Option<String>,
+    /// Usage frequencies for MultipleCopyFileAllocation (comma-separated, e.g., "5,4,3,2")
+    #[arg(long)]
+    pub usage: Option<String>,
+    /// Storage costs for MultipleCopyFileAllocation (comma-separated, e.g., "1,1,1,1")
+    #[arg(long)]
+    pub storage: Option<String>,
     /// Deadlines for scheduling problems (comma-separated, e.g., "5,5,5,3,3")
     #[arg(long)]
     pub deadlines: Option<String>,
